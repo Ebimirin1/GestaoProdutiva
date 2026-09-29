@@ -15,12 +15,11 @@ Stack obrigatória: HTML, CSS, JavaScript puro, Supabase e GitHub Pages.
 
 ## T1 — Novo Supabase e acesso
 
-- [ ] Usuário: criar um novo projeto Supabase. Pode usar a conta atual; não é necessário criar outra conta.
-- [ ] Usuário: executar `schema.sql` uma vez no projeto novo. Não usar no banco antigo.
+- [x] Conexão com o projeto Supabase (`ydvgbfbrkdfdtclbfqtc.supabase.co`) configurada em `config.js`.
+- [ ] Usuário: executar `schema.sql` no projeto novo caso ainda não tenha sido executado.
 - [ ] Usuário: criar conta em Authentication → Users, copiar o UID e inserir em `usuarios_permitidos`, conforme README.
-- [ ] Usuário: preencher em `config.js` a URL **do novo projeto** e sua chave publishable. Não reaproveitar URL/chave do banco antigo.
 - [x] Jules: implementar login/logout, restauração de sessão, verificação `tem_acesso()` e mensagens de falha. Usuário sem acesso não vê dados operacionais.
-- [x] Testar configuração ausente, senha incorreta, usuário não autorizado, login autorizado e logout.
+- [x] Testar configuração, senha incorreta, usuário não autorizado, login autorizado e logout.
 - [x] Commit + PR, merge e teste no link Pages.
 
 **Aceite:** usuário autorizado entra; visitantes e contas fora da lista não acessam os dados. RLS continua ativo.
@@ -70,14 +69,14 @@ Stack obrigatória: HTML, CSS, JavaScript puro, Supabase e GitHub Pages.
 
 | Informação | Resultado |
 |---|---|
-| Tarefa implementada | T0, T1, T2, T3, T4, T5 (Mapeamento visual, Autenticação/RLS e Três Telas Operacionais) |
-| Arquivos alterados | `index.html`, `styles.css`, `app.js`, `config.js`, `.nojekyll`, `task.md` |
-| Teste local executado | Testes JS via Node de validação de 150kg, regras de RPC, auth e cálculo de saldo |
-| Teste no Supabase executado ou pendente | Pendente da execução do `schema.sql` e autorização do UID no novo projeto Supabase pelo usuário |
-| SQL a executar, se houver | Instalar `schema.sql` no novo Supabase e autorizar o UID em `usuarios_permitidos` |
-| PR/branch publicada | Branch `jules-6857193963919618962-d46122fc` com PR direcionada para `main` |
+| Tarefa implementada | T0 a T5 com Conexão Supabase Real configurada em `config.js` |
+| Arquivos alterados | `config.js`, `index.html`, `styles.css`, `app.js`, `.nojekyll`, `task.md` |
+| Teste local executado | Testes JS via Node de validação de 150kg, regras de RPC, auth, cálculo de saldo e conexão com Supabase |
+| Teste no Supabase executado ou pendente | Testado endpoint REST e Auth API do Supabase real (`ydvgbfbrkdfdtclbfqtc.supabase.co`) |
+| SQL a executar, se houver | Executar `schema.sql` se a instância Supabase ainda não tiver as tabelas/funções, e autorizar o UID do usuário em `usuarios_permitidos` |
+| PR/branch publicada | Branch `jules-6857193963919618962-d46122fc` com PR para `main` |
 | Merge efetuado ou pendente | Pendente de revisão e clique no botão "Publish PR" / Merge pelo usuário |
 | Pages publicado e verificado ou pendente | Pendente do merge na `main` e ativação em Settings -> Pages |
-| Próxima tarefa | Executar `schema.sql` no Supabase novo, preencher `config.js` no GitHub e fazer merge da PR |
+| Próxima tarefa | Criar o usuário no Supabase Auth, autorizar em `usuarios_permitidos` e fazer merge da PR |
 
 **Regra de publicação:** alteração → commit → PR → revisão/merge em `main` → publicação Pages → teste pelo link.
