@@ -1,21 +1,24 @@
-/* app.js — Lógica da Aplicação Controle de Produção Simples (Acesso Público Sem Login) */
+/* app.js — Lógica da Aplicação Controle de Produção Simples (Autenticado via Supabase Auth) */
 
 // Variáveis Globais
 let supabaseClient = null;
+let currentUser = null;
+let userIsAuthorized = false;
 let colaboradoresList = [];
 let opList = [];
 let selectedProducaoOpId = null;
 let opSaboresMap = {}; // ordem_id -> array de sabores
 
+const ADMIN_UID = 'fc952189-34d3-4963-b6c6-f408a249a47b';
+
 // ============================================================================
-// 1. INICIALIZAÇÃO & ROTEAMENTO POR HASH
+// 1. INICIALIZAÇÃO, ROTEAMENTO & SESSÃO AUTH
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
   initSupabase();
   setupRouter();
-  await loadColaboradores();
-  router(); // Carregar dados da tela inicial
+  await checkSessionAndPermissions();
 });
 
 function initSupabase() {
@@ -86,10 +89,130 @@ function router() {
     headerTitle.textContent = titles[activeScreen];
   }
 
-  // Carregar dados da tela selecionada
-  if (activeScreen === 'planejamento') loadPlanejamentoData();
-  if (activeScreen === 'producao') loadProducaoData();
-  if (activeScreen === 'expedicao') loadExpedicaoData();
+  // Carregar dados se autenticado e autorizado
+  if (userIsAuthorized) {
+    if (activeScreen === 'planejamento') loadPlanejamentoData();
+    if (activeScreen === 'producao') loadProducaoData();
+    if (activeScreen === 'expedicao') loadExpedicaoData();
+  }
+}
+
+// Check de sessão e autorização RLS (tem_acesso)
+async function checkSessionAndPermissions() {
+  if (!supabaseClient) return;
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  if (session && session.user) {
+    currentUser = session.user;
+    updateUserUiLoggedIn(currentUser);
+    await verifyUserAccess();
+  } else {
+    currentUser = null;
+    userIsAuthorized = false;
+    updateUserUiLoggedOut();
+  }
+
+  // Escutar mudanças de autenticação
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    if (session && session.user) {
+      currentUser = session.user;
+      updateUserUiLoggedIn(currentUser);
+      await verifyUserAccess();
+    } else {
+      currentUser = null;
+      userIsAuthorized = false;
+      updateUserUiLoggedOut();
+    }
+  });
+}
+
+async function verifyUserAccess() {
+  if (!supabaseClient || !currentUser) {
+    userIsAuthorized = false;
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc('tem_acesso');
+    if (error) {
+      console.warn('Erro na chamada tem_acesso():', error);
+      userIsAuthorized = false;
+    } else {
+      userIsAuthorized = !!data;
+    }
+  } catch (e) {
+    console.error('Falha na consulta tem_acesso:', e);
+    userIsAuthorized = false;
+  }
+
+  if (!userIsAuthorized) {
+    showGlobalAlert('Atenção: Seu usuário autenticado não possui autorização no banco de dados. Execute a migração "restaurar_acesso_admin.sql" no SQL Editor do Supabase para autorizar.');
+  } else {
+    hideGlobalAlert();
+    await loadColaboradores();
+    router(); // Recarregar dados da tela atual
+  }
+}
+
+function updateUserUiLoggedIn(user) {
+  const displayEl = document.getElementById('user-display-email');
+  if (displayEl) {
+    if (user.id === ADMIN_UID) {
+      displayEl.textContent = 'Admin (' + user.email + ')';
+    } else {
+      displayEl.textContent = user.email;
+    }
+  }
+  document.getElementById('btn-open-login').classList.add('hidden');
+  document.getElementById('btn-logout').classList.remove('hidden');
+}
+
+function updateUserUiLoggedOut() {
+  const displayEl = document.getElementById('user-display-email');
+  if (displayEl) displayEl.textContent = 'Não autenticado';
+  document.getElementById('btn-open-login').classList.remove('hidden');
+  document.getElementById('btn-logout').classList.add('hidden');
+  showGlobalAlert('Acesso restrito. Efetue login para visualizar os dados operacionais.');
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorMsgEl = document.getElementById('login-error-msg');
+  const btnSubmit = document.getElementById('btn-login-submit');
+
+  errorMsgEl.classList.add('hidden');
+  btnSubmit.disabled = true;
+  btnSubmit.innerHTML = 'Entrando...';
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    closeModal('modal-login');
+  } catch (err) {
+    errorMsgEl.textContent = err.message || 'Falha na autenticação. Verifique e-mail e senha.';
+    errorMsgEl.classList.remove('hidden');
+  } finally {
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = '<span>Entrar no Sistema</span>';
+  }
+}
+
+async function handleLogout() {
+  if (supabaseClient) {
+    await supabaseClient.auth.signOut();
+  }
+  currentUser = null;
+  userIsAuthorized = false;
+  updateUserUiLoggedOut();
+}
+
+function openLoginModal() {
+  document.getElementById('login-error-msg').classList.add('hidden');
+  openModal('modal-login');
 }
 
 // Helpers para exibição de alertas globais e formatação de erros
@@ -112,8 +235,8 @@ function formatErrorMessage(err) {
   const code = err.code || '';
   const message = err.message || String(err);
 
-  if (code === '42501' || message.includes('permission denied')) {
-    return 'Erro de permissão no Supabase (42501): O banco ainda não possui permissão de acesso aberto. Execute o arquivo "liberar_acesso_publico.sql" no SQL Editor do seu projeto Supabase.';
+  if (code === '42501' || message.includes('permission denied') || message.includes('Usuário sem autorização')) {
+    return 'Erro de permissão no Supabase (42501): Usuário sem autorização. Execute o arquivo "restaurar_acesso_admin.sql" no SQL Editor do seu projeto Supabase para autorizar este UID.';
   }
   return message;
 }
@@ -123,7 +246,7 @@ function formatErrorMessage(err) {
 // ============================================================================
 
 async function loadColaboradores() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !userIsAuthorized) return;
 
   try {
     const { data, error } = await supabaseClient
@@ -232,7 +355,7 @@ function openColaboradoresModal() {
 // ============================================================================
 
 async function loadPlanejamentoData() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !userIsAuthorized) return;
 
   const tbody = document.getElementById('lista-ops-tbody');
   tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-text-muted">Carregando OPs...</td></tr>';
@@ -536,7 +659,7 @@ async function cancelarOp(opId) {
 // ============================================================================
 
 async function loadProducaoData() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !userIsAuthorized) return;
 
   try {
     // Carregar OPs ativas para o dropdown
@@ -708,7 +831,7 @@ function renderEmbutimentoList(sabores) {
   const container = document.getElementById('lista-embutimento-container');
 
   if (sabores.length === 0) {
-    container.innerHTML = '<p class="text-text-muted text-sm py-4 text-center">Nenhum sabor cadastrado para esta OP.</p>';
+    container.innerHTML = '<p class="text-text-muted text-sm py-4 text-center">Nenum sabor cadastrado para esta OP.</p>';
     return;
   }
 
@@ -991,7 +1114,7 @@ function showBateladaError(msg) {
 // ============================================================================
 
 async function loadExpedicaoData() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !userIsAuthorized) return;
 
   try {
     // 1. Carregar Pedidos e seus itens
