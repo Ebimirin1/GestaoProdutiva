@@ -97,20 +97,13 @@
         </nav>
       </div>
 
-      <!-- User Profile / Session Status Footer -->
-      <div class="p-4 bg-black/30 border-t border-white/10 flex flex-col gap-2">
+      <!-- System Mode Footer -->
+      <div class="p-4 bg-black/30 border-t border-white/10 flex flex-col gap-1">
         <div class="flex items-center justify-between text-xs text-white/80">
-          <span class="uppercase tracking-wider font-semibold">Operador</span>
-          <span id="user-display-email" class="font-mono text-amber-300 truncate max-w-[120px]">Não autenticado</span>
+          <span class="uppercase tracking-wider font-semibold">Modo de Operação</span>
+          <span class="font-bold text-emerald-400">Acesso Livre</span>
         </div>
-        <div class="flex gap-2 mt-1">
-          <button id="btn-open-login" onclick="openLoginModal()" class="flex-1 py-1.5 px-3 rounded bg-brand-gold hover:bg-amber-600 text-brand-ink font-bold text-xs flex items-center justify-center gap-1 transition-all">
-            <span class="material-symbols-outlined text-sm">login</span> Login
-          </button>
-          <button id="btn-logout" onclick="handleLogout()" class="hidden py-1.5 px-3 rounded bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all">
-            <span class="material-symbols-outlined text-sm">logout</span> Sair
-          </button>
-        </div>
+        <p class="text-[11px] text-white/60">Operação direta sem senha</p>
       </div>
     </aside>
 
@@ -129,7 +122,7 @@
         </div>
       </header>
 
-      <!-- Global Alert Banner for Authorization / Config issues -->
+      <!-- Global Alert Banner for Config issues -->
       <div id="global-alert-banner" class="hidden bg-error-bg border-b border-red-200 text-error-text p-4 px-8 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <span class="material-symbols-outlined text-2xl text-error-text">error</span>
@@ -380,33 +373,7 @@
   <!-- MODAIS                                     -->
   <!-- ========================================== -->
 
-  <!-- Modal 1: Login / Autenticação -->
-  <div id="modal-login" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-surface rounded-xl max-w-md w-full p-6 shadow-2xl border border-border relative">
-      <button onclick="closeModal('modal-login')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
-      <div class="text-center mb-6">
-        <span class="material-symbols-outlined text-4xl text-primary mb-1">lock</span>
-        <h3 class="text-xl font-bold font-serif text-brand-ink">Acesso ao Sistema</h3>
-        <p class="text-xs text-text-muted mt-1">Entre com e-mail e senha cadastrados pelo administrador no Supabase Auth.</p>
-      </div>
-      <form id="form-login" onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-4">
-        <div>
-          <label class="block text-xs font-bold text-brand-ink mb-1">E-mail</label>
-          <input type="email" id="login-email" required placeholder="operador@famosalinguica.com.br" class="w-full p-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary" />
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-brand-ink mb-1">Senha</label>
-          <input type="password" id="login-password" required placeholder="••••••••" class="w-full p-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary" />
-        </div>
-        <div id="login-error-msg" class="hidden text-xs text-error-text bg-error-bg p-2.5 rounded font-semibold"></div>
-        <button type="submit" id="btn-login-submit" class="w-full py-3 bg-primary hover:bg-brand-wine text-white rounded-lg font-bold text-sm shadow transition-all flex items-center justify-center gap-2">
-          <span>Entrar no Sistema</span>
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal 2: Colaboradores -->
+  <!-- Modal 1: Colaboradores -->
   <div id="modal-colaboradores" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="bg-surface rounded-xl max-w-lg w-full p-6 shadow-2xl border border-border relative">
       <button onclick="closeModal('modal-colaboradores')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
@@ -440,7 +407,7 @@
     </div>
   </div>
 
-  <!-- Modal 3: Nova / Edição Ordem de Produção (OP) -->
+  <!-- Modal 2: Nova / Edição Ordem de Produção (OP) -->
   <div id="modal-nova-op" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="bg-surface rounded-xl max-w-2xl w-full p-6 shadow-2xl border border-border relative max-h-[90vh] overflow-y-auto">
       <button onclick="closeModal('modal-nova-op')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
@@ -509,7 +476,7 @@
     </div>
   </div>
 
-  <!-- Modal 4: Nova Batelada -->
+  <!-- Modal 3: Nova Batelada -->
   <div id="modal-nova-batelada" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="bg-surface rounded-xl max-w-xl w-full p-6 shadow-2xl border border-border relative max-h-[90vh] overflow-y-auto">
       <button onclick="closeModal('modal-nova-batelada')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
@@ -590,7 +557,7 @@
     </div>
   </div>
 
-  <!-- Modal 5: Novo Pedido de Atacado -->
+  <!-- Modal 4: Novo Pedido de Atacado -->
   <div id="modal-novo-pedido" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="bg-surface rounded-xl max-w-2xl w-full p-6 shadow-2xl border border-border relative max-h-[90vh] overflow-y-auto">
       <button onclick="closeModal('modal-novo-pedido')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
