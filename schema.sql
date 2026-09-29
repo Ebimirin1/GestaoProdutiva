@@ -1,5 +1,6 @@
--- CONTROLE DE PRODUÇÃO SIMPLES — PostgreSQL / Supabase — Acesso Público (Sem Login)
+-- CONTROLE DE PRODUÇÃO SIMPLES — PostgreSQL / Supabase — v1 — 29/09/2026
 -- Execute inteiro UMA VEZ no NOVO projeto Supabase, no SQL Editor.
+-- Não é migração do projeto antigo. Não inclui usuários ou dados de exemplo.
 -- Se tabelas do aplicativo já existirem, aborta a transação sem apagar dados.
 
 BEGIN;
@@ -16,7 +17,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- Lista de acesso mantida para compatibilidade
+-- Lista de acesso: somente usuários no Supabase Auth e autorizados nesta tabela têm acesso.
 CREATE TABLE public.usuarios_permitidos (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   ativo boolean NOT NULL DEFAULT true,
@@ -119,7 +120,7 @@ CREATE TABLE public.pedido_item (
 );
 CREATE INDEX pedido_item_sabor_idx ON public.pedido_item(ordem_sabor_id, ordem_id);
 
--- Datas de atualização do servidor
+-- Datas de atualização do servidor.
 CREATE FUNCTION public.atualizar_data_modificacao()
 RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN
@@ -136,11 +137,24 @@ BEGIN
   END LOOP;
 END $$;
 
--- Permissões de esquema e sequências
-GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+-- A lista usuarios_permitidos usa RLS
+ALTER TABLE public.usuarios_permitidos ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.usuarios_permitidos FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.usuarios_permitidos TO authenticated;
+CREATE POLICY consultar_proprio_acesso ON public.usuarios_permitidos
+  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
 
--- RLS habilitado com acesso público para anon e authenticated (sem login)
+CREATE FUNCTION public.tem_acesso()
+RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.usuarios_permitidos
+    WHERE user_id = (SELECT auth.uid()) AND ativo
+  );
+$$;
+REVOKE ALL ON FUNCTION public.tem_acesso() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.tem_acesso() TO authenticated;
+
+-- RLS habilitado para a equipe autorizada
 DO $$
 DECLARE nome text;
 BEGIN
@@ -148,20 +162,23 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', nome);
     EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC, anon, authenticated', nome);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE ON public.%I TO anon, authenticated', nome);
-    EXECUTE format('CREATE POLICY acesso_publico_leitura ON public.%I FOR SELECT TO anon, authenticated USING (true)', nome);
-    EXECUTE format('CREATE POLICY acesso_publico_inclusao ON public.%I FOR INSERT TO anon, authenticated WITH CHECK (true)', nome);
-    EXECUTE format('CREATE POLICY acesso_publico_alteracao ON public.%I FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true)', nome);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE ON public.%I TO authenticated', nome);
+    EXECUTE format('CREATE POLICY equipe_leitura ON public.%I FOR SELECT TO authenticated USING ((SELECT public.tem_acesso()))', nome);
+    EXECUTE format('CREATE POLICY equipe_inclusao ON public.%I FOR INSERT TO authenticated WITH CHECK ((SELECT public.tem_acesso()))', nome);
+    EXECUTE format('CREATE POLICY equipe_alteracao ON public.%I FOR UPDATE TO authenticated USING ((SELECT public.tem_acesso())) WITH CHECK ((SELECT public.tem_acesso()))', nome);
   END LOOP;
 END $$;
 
--- Criação atômica de OP + sabores (sem verificação de login)
+-- Criação de OP e sabores na mesma transação
 CREATE FUNCTION public.fn_criar_ordem_producao(
   p_numero text, p_data date, p_responsavel text, p_observacoes text, p_sabores jsonb
 )
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v_id uuid; v_sabor jsonb;
 BEGIN
+  IF NOT public.tem_acesso() THEN
+    RAISE EXCEPTION 'Usuário sem autorização.' USING ERRCODE = '42501';
+  END IF;
   IF jsonb_typeof(p_sabores) IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'Sabores deve ser uma lista.' USING ERRCODE = '22023';
   END IF;
@@ -181,9 +198,10 @@ BEGIN
   END LOOP;
   RETURN v_id;
 END $$;
-GRANT EXECUTE ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) TO authenticated;
 
--- Criação atômica de Pedido + itens (sem verificação de login)
+-- Criação de Pedido + itens
 CREATE FUNCTION public.fn_criar_pedido(
   p_numero text, p_ordem_id uuid, p_cliente text, p_data date,
   p_destino text, p_observacoes text, p_itens jsonb
@@ -191,6 +209,9 @@ CREATE FUNCTION public.fn_criar_pedido(
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v_id uuid; v_item jsonb;
 BEGIN
+  IF NOT public.tem_acesso() THEN
+    RAISE EXCEPTION 'Usuário sem autorização.' USING ERRCODE = '42501';
+  END IF;
   IF jsonb_typeof(p_itens) IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'Itens deve ser uma lista.' USING ERRCODE = '22023';
   END IF;
@@ -212,6 +233,7 @@ BEGIN
   END LOOP;
   RETURN v_id;
 END $$;
-GRANT EXECUTE ON FUNCTION public.fn_criar_pedido(text,uuid,text,date,text,text,jsonb) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.fn_criar_pedido(text,uuid,text,date,text,text,jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_criar_pedido(text,uuid,text,date,text,text,jsonb) TO authenticated;
 
 COMMIT;

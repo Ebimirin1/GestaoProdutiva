@@ -2,18 +2,20 @@
 
 ## Objetivo
 
-Implementar o MVP descrito em `spec.md`, acompanhando `task.md`. São exatamente três telas: Planejamento, Produção e Expedição. O aplicativo é aberto e público, sem tela de login, senha ou verificação de sessão.
+Implementar o MVP descrito em `spec.md`, acompanhando `task.md`. São exatamente três telas: Planejamento, Produção e Expedição. O login usa um modal de acesso por e-mail e senha via Supabase Auth.
 
 ## Arquitetura obrigatória
 
-HTML + CSS + JavaScript puro; Supabase PostgreSQL/cliente JS; GitHub Pages. Sem framework de frontend, servidor Express/FastAPI, ORM ou build obrigatório.
+HTML + CSS + JavaScript puro; Supabase PostgreSQL/Auth/cliente JS; GitHub Pages. Sem framework de frontend, servidor Express/FastAPI, ORM ou build obrigatório.
 
 ## Regras de Acesso e Banco
 
-- O acesso é livre para visitantes (papel `anon` do Supabase).
-- NUNCA utilize `service_role`, chaves secretas ou senhas no código frontend.
-- Mantenha RLS habilitado com permissões de `SELECT, INSERT, UPDATE` para `anon`. Não conceda `DELETE`.
-- Para o banco existente, forneça o arquivo incremental `liberar_acesso_publico.sql`. Não execute SQL no banco remoto por conta própria.
+- Autenticação por e-mail/senha no Supabase Auth.
+- Autorização mantida pela tabela `usuarios_permitidos` e função `tem_acesso()`.
+- O administrador possui o UID `fc952189-34d3-4963-b6c6-f408a249a47b`.
+- NUNCA coloque senhas, `service_role` ou chaves secretas no código frontend ou histórico.
+- Mantenha RLS habilitado.
+- Para o banco existente no Supabase, forneça o arquivo incremental `restaurar_acesso_admin.sql`. Não execute SQL no banco remoto por conta própria.
 - O `schema.sql` atualizado é utilizado para instalações novas.
 
 ## Resumo das três telas
