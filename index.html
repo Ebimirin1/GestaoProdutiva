@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Famosa Linguiça — Controle de Produção Artesanal</title>
+
+  <!-- Google Fonts & Material Symbols -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..700&family=Work+Sans:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#ab0001",
+            "primary-container": "#d90404",
+            "brand-wine": "#590202",
+            "brand-ink": "#260101",
+            "brand-gold": "#D99311",
+            "surface": "#FFFFFF",
+            "page-bg": "#F8F6F4",
+            "border": "#E8E1DF",
+            "text-muted": "#5C5150",
+            "error-text": "#8C0303",
+            "error-bg": "#FDE8E8",
+            "success": "#176B45",
+            "info": "#205A85",
+            "warning-bg": "#FFF2D6",
+            "warning-text": "#4A2C00"
+          },
+          fontFamily: {
+            serif: ["'Source Serif 4'", "Georgia", "serif"],
+            sans: ["'Work Sans'", "system-ui", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Config file -->
+  <script src="./config.js"></script>
+</head>
+
+<body class="bg-page-bg text-brand-ink antialiased font-sans">
+  <!-- Layout Wrapper -->
+  <div class="min-h-screen flex flex-col md:flex-row">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 bg-brand-wine text-white z-50 flex flex-col justify-between shadow-lg shrink-0">
+      <div>
+        <!-- Logo Header -->
+        <div class="h-16 px-4 flex items-center gap-3 bg-black/20 border-b border-white/10">
+          <span class="material-symbols-outlined text-brand-gold text-3xl">outdoor_grill</span>
+          <div class="flex flex-col">
+            <span class="font-serif font-bold text-lg text-white leading-tight">Famosa</span>
+            <span class="text-[10px] uppercase tracking-wider text-brand-gold font-bold">Linguiça Artesanal</span>
+          </div>
+        </div>
+
+        <!-- Connection Status Indicator -->
+        <div class="p-3">
+          <div class="px-3 py-2 rounded bg-white/10 text-white flex items-center justify-between text-xs">
+            <span class="uppercase tracking-wide text-white/80 font-medium">Status do Banco</span>
+            <span id="db-status-badge" class="inline-flex items-center gap-1 font-bold text-amber-300">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Configurar
+            </span>
+          </div>
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="flex flex-col gap-1 px-2 mt-2" id="main-nav">
+          <a href="#planejamento" data-screen="planejamento" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white font-medium transition-all">
+            <span class="material-symbols-outlined text-xl">event_note</span>
+            <span>1. Planejamento</span>
+          </a>
+          <a href="#producao" data-screen="producao" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white font-medium transition-all">
+            <span class="material-symbols-outlined text-xl">precision_manufacturing</span>
+            <span>2. Produção</span>
+          </a>
+          <a href="#expedicao" data-screen="expedicao" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white font-medium transition-all">
+            <span class="material-symbols-outlined text-xl">local_shipping</span>
+            <span>3. Expedição</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- User Profile / Session Status Footer -->
+      <div class="p-4 bg-black/30 border-t border-white/10 flex flex-col gap-2">
+        <div class="flex items-center justify-between text-xs text-white/80">
+          <span class="uppercase tracking-wider font-semibold">Operador</span>
+          <span id="user-display-email" class="font-mono text-amber-300 truncate max-w-[120px]">Não autenticado</span>
+        </div>
+        <div class="flex gap-2 mt-1">
+          <button id="btn-open-login" onclick="openLoginModal()" class="flex-1 py-1.5 px-3 rounded bg-brand-gold hover:bg-amber-600 text-brand-ink font-bold text-xs flex items-center justify-center gap-1 transition-all">
+            <span class="material-symbols-outlined text-sm">login</span> Login
+          </button>
+          <button id="btn-logout" onclick="handleLogout()" class="hidden py-1.5 px-3 rounded bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all">
+            <span class="material-symbols-outlined text-sm">logout</span> Sair
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Top Header -->
+      <header class="h-16 bg-surface shadow-sm border-b border-border z-40 flex items-center justify-between px-4 md:px-8">
+        <div class="flex items-center gap-3">
+          <h2 id="header-screen-title" class="font-serif text-xl font-bold text-error-text">Planejamento de Produção</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="window.print()" class="no-print inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-border text-text-muted hover:text-brand-ink text-xs font-semibold bg-surface shadow-sm">
+            <span class="material-symbols-outlined text-base">print</span> Imprimir
+          </button>
+        </div>
+      </header>
+
+      <!-- Global Alert Banner for Authorization / Config issues -->
+      <div id="global-alert-banner" class="hidden bg-error-bg border-b border-red-200 text-error-text p-4 px-8 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-2xl text-error-text">error</span>
+          <span id="global-alert-message" class="text-sm font-semibold">Aviso do sistema</span>
+        </div>
+        <button onclick="hideGlobalAlert()" class="text-error-text hover:text-red-900 font-bold text-sm">✕</button>
+      </div>
+
+      <!-- Screens Views Container -->
+      <main class="p-4 md:p-8 flex-1">
+
+        <!-- ========================================== -->
+        <!-- TELA 1: PLANEJAMENTO                       -->
+        <!-- ========================================== -->
+        <section id="screen-planejamento" class="screen-view">
+          <!-- Action Bar -->
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 class="font-serif text-2xl font-bold text-brand-ink">Ordens de Produção (OP)</h1>
+              <p class="text-sm text-text-muted">Acompanhe as OPs criadas e programe os volumes por sabor.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="openColaboradoresModal()" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface border border-border text-brand-wine hover:bg-gray-50 text-sm font-semibold shadow-sm transition-all">
+                <span class="material-symbols-outlined text-lg">group</span> Colaboradores
+              </button>
+              <button onclick="openNovaOpModal()" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-brand-wine text-white text-sm font-bold shadow transition-all">
+                <span class="material-symbols-outlined text-lg">add_circle</span> + Nova OP
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <span class="text-xs font-bold uppercase tracking-wider text-text-muted">Total OPs Criadas</span>
+              <div id="stat-op-count" class="text-3xl font-bold text-brand-ink mt-1">0</div>
+            </div>
+            <div class="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <span class="text-xs font-bold uppercase tracking-wider text-text-muted">Volume Planejado Total</span>
+              <div id="stat-op-volume" class="text-3xl font-bold text-primary mt-1">0,000 kg</div>
+            </div>
+            <div class="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <span class="text-xs font-bold uppercase tracking-wider text-text-muted">OPs Em Produção</span>
+              <div id="stat-op-em-producao" class="text-3xl font-bold text-amber-600 mt-1">0</div>
+            </div>
+          </div>
+
+          <!-- OPs Table List -->
+          <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-border bg-gray-50 flex items-center justify-between">
+              <h3 class="font-bold text-brand-ink">Lista de Ordens de Produção</h3>
+              <button onclick="loadPlanejamentoData()" class="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">refresh</span> Atualizar
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-gray-100 text-xs uppercase font-bold text-text-muted border-b border-border">
+                  <tr>
+                    <th class="p-3">Nº OP</th>
+                    <th class="p-3">Data</th>
+                    <th class="p-3">Responsável</th>
+                    <th class="p-3">Situação</th>
+                    <th class="p-3">Sabores & Vol. (kg)</th>
+                    <th class="p-3 text-right">Total Planejado</th>
+                    <th class="p-3 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="lista-ops-tbody" class="divide-y divide-border">
+                  <tr>
+                    <td colspan="7" class="p-8 text-center text-text-muted">Carregando ordens de produção...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TELA 2: PRODUÇÃO                           -->
+        <!-- ========================================== -->
+        <section id="screen-producao" class="screen-view hidden">
+          <!-- Action Bar & OP Selector -->
+          <div class="bg-surface p-4 rounded-xl border border-border shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="font-serif text-2xl font-bold text-brand-ink">Acompanhamento da Produção</h1>
+              <p class="text-sm text-text-muted">Selecione uma Ordem de Produção para gerenciar bateladas, temperos e embutimento.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <label for="select-op-producao" class="text-sm font-bold text-brand-ink whitespace-nowrap">Selecionar OP:</label>
+              <select id="select-op-producao" onchange="handleSelectOpProducao(this.value)" class="p-2 border border-border rounded-lg bg-white font-bold text-brand-wine text-base min-w-[200px] shadow-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- Escolha uma OP --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Empty State when no OP selected -->
+          <div id="producao-empty-state" class="bg-surface rounded-xl border border-border p-12 text-center text-text-muted">
+            <span class="material-symbols-outlined text-5xl text-gray-300 mb-2">precision_manufacturing</span>
+            <p class="text-base font-medium">Selecione uma OP acima para visualizar e gerenciar as bateladas e o embutimento por sabor.</p>
+          </div>
+
+          <!-- OP Active Container -->
+          <div id="producao-content-container" class="hidden flex flex-col gap-8">
+
+            <!-- OP Summary Details Header -->
+            <div class="bg-brand-wine text-white p-4 rounded-xl shadow-md flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span class="text-xs uppercase tracking-wider text-brand-gold font-bold">OP Selecionada</span>
+                <h2 id="prod-op-titulo" class="text-2xl font-bold font-serif">OP #---</h2>
+                <p id="prod-op-subtitulo" class="text-xs text-white/80">Data: --/--/---- • Responsável: --- • Situação: ---</p>
+              </div>
+              <div class="flex gap-4">
+                <div class="text-right">
+                  <span class="text-[10px] uppercase text-white/70">Total Planejado</span>
+                  <div id="prod-op-total-planejado" class="text-xl font-bold text-amber-300">0,000 kg</div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] uppercase text-white/70">Total Embutido Real</span>
+                  <div id="prod-op-total-embutido" class="text-xl font-bold text-emerald-300">0,000 kg</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEÇÃO A: TEMPEROS E BATELADAS -->
+            <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+              <div class="p-4 bg-gray-50 border-b border-border flex items-center justify-between cursor-pointer" onclick="toggleSection('sec-bateladas-body')">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-brand-wine">blender</span>
+                  <h3 class="font-bold text-brand-ink text-lg">Seção A — Bateladas e Temperos</h3>
+                  <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">Máx. 150 kg por batelada</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button onclick="event.stopPropagation(); openNovaBateladaModal()" class="px-3 py-1.5 rounded bg-primary hover:bg-brand-wine text-white text-xs font-bold flex items-center gap-1 shadow">
+                    <span class="material-symbols-outlined text-sm">add</span> Nova Batelada
+                  </button>
+                  <span class="material-symbols-outlined text-gray-500">expand_more</span>
+                </div>
+              </div>
+
+              <div id="sec-bateladas-body" class="p-4">
+                <div id="lista-bateladas-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <!-- Rendered dynamically -->
+                  <p class="text-text-muted text-sm col-span-2 py-4 text-center">Nenhuma batelada cadastrada para esta OP.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEÇÃO B: INSUMOS E EMBUTIMENTO POR SABOR -->
+            <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+              <div class="p-4 bg-gray-50 border-b border-border flex items-center justify-between cursor-pointer" onclick="toggleSection('sec-embutimento-body')">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-brand-wine">inventory_2</span>
+                  <h3 class="font-bold text-brand-ink text-lg">Seção B — Insumos e Embutimento por Sabor</h3>
+                </div>
+                <span class="material-symbols-outlined text-gray-500">expand_more</span>
+              </div>
+
+              <div id="sec-embutimento-body" class="p-4">
+                <div id="lista-embutimento-container" class="flex flex-col gap-4">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TELA 3: EXPEDIÇÃO                          -->
+        <!-- ========================================== -->
+        <section id="screen-expedicao" class="screen-view hidden">
+          <!-- Action Bar -->
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 class="font-serif text-2xl font-bold text-brand-ink">Expedição e Pedidos Atacado</h1>
+              <p class="text-sm text-text-muted">Gerencie pedidos de clientes de atacado e confira o saldo estimado para a loja.</p>
+            </div>
+            <button onclick="openNovoPedidoModal()" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-brand-wine text-white text-sm font-bold shadow transition-all">
+              <span class="material-symbols-outlined text-lg">add_shopping_cart</span> + Novo Pedido Atacado
+            </button>
+          </div>
+
+          <!-- Matriz de Resumo por Sabor -->
+          <div class="bg-surface rounded-xl border border-border shadow-sm p-4 mb-6">
+            <h3 class="font-bold text-brand-ink mb-3 flex items-center gap-2 text-base">
+              <span class="material-symbols-outlined text-primary">analytics</span> Resumo Geral por Sabor (Saldo da Loja)
+            </h3>
+            <p class="text-xs text-text-muted mb-4">Saldo estimado para a loja = Embutido informado − Separado em pedidos ativos. (Pedidos cancelados não reduzem o saldo).</p>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm border-collapse">
+                <thead class="bg-gray-100 text-xs font-bold uppercase text-text-muted border-b border-border">
+                  <tr>
+                    <th class="p-2 border-r border-border">Sabor</th>
+                    <th class="p-2 border-r border-border text-right">Planejado (kg)</th>
+                    <th class="p-2 border-r border-border text-right">Embutido Real (kg)</th>
+                    <th class="p-2 border-r border-border text-right">Solicitado Atacado (kg)</th>
+                    <th class="p-2 border-r border-border text-right">Separado Atacado (kg)</th>
+                    <th class="p-2 text-right">Saldo Estimado Loja (kg)</th>
+                  </tr>
+                </thead>
+                <tbody id="resumo-sabores-expedicao-tbody" class="divide-y divide-border">
+                  <tr>
+                    <td colspan="6" class="p-4 text-center text-text-muted">Carregando resumo de sabores...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Lista de Pedidos de Atacado -->
+          <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-border bg-gray-50 flex items-center justify-between">
+              <h3 class="font-bold text-brand-ink">Pedidos de Atacado</h3>
+              <button onclick="loadExpedicaoData()" class="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">refresh</span> Atualizar
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-gray-100 text-xs uppercase font-bold text-text-muted border-b border-border">
+                  <tr>
+                    <th class="p-3">Nº Pedido</th>
+                    <th class="p-3">OP Vinculada</th>
+                    <th class="p-3">Cliente Atacado</th>
+                    <th class="p-3">Data</th>
+                    <th class="p-3">Situação</th>
+                    <th class="p-3">Itens (Sabor, Conservação, Solicitado, Separado)</th>
+                    <th class="p-3 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="lista-pedidos-tbody" class="divide-y divide-border">
+                  <tr>
+                    <td colspan="7" class="p-8 text-center text-text-muted">Carregando pedidos de expedição...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAIS                                     -->
+  <!-- ========================================== -->
+
+  <!-- Modal 1: Login / Autenticação -->
+  <div id="modal-login" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-surface rounded-xl max-w-md w-full p-6 shadow-2xl border border-border relative">
+      <button onclick="closeModal('modal-login')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
+      <div class="text-center mb-6">
+        <span class="material-symbols-outlined text-4xl text-primary mb-1">lock</span>
+        <h3 class="text-xl font-bold font-serif text-brand-ink">Acesso ao Sistema</h3>
+        <p class="text-xs text-text-muted mt-1">Entre com e-mail e senha cadastrados pelo administrador no Supabase Auth.</p>
+      </div>
+      <form id="form-login" onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-bold text-brand-ink mb-1">E-mail</label>
+          <input type="email" id="login-email" required placeholder="operador@famosalinguica.com.br" class="w-full p-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-brand-ink mb-1">Senha</label>
+          <input type="password" id="login-password" required placeholder="••••••••" class="w-full p-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary" />
+        </div>
+        <div id="login-error-msg" class="hidden text-xs text-error-text bg-error-bg p-2.5 rounded font-semibold"></div>
+        <button type="submit" id="btn-login-submit" class="w-full py-3 bg-primary hover:bg-brand-wine text-white rounded-lg font-bold text-sm shadow transition-all flex items-center justify-center gap-2">
+          <span>Entrar no Sistema</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Colaboradores -->
+  <div id="modal-colaboradores" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-surface rounded-xl max-w-lg w-full p-6 shadow-2xl border border-border relative">
+      <button onclick="closeModal('modal-colaboradores')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
+      <h3 class="text-xl font-bold font-serif text-brand-ink mb-4 flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">group</span> Colaboradores da Fábrica
+      </h3>
+
+      <!-- Cadastro Form -->
+      <form id="form-colaborador" onsubmit="handleSalvarColaborador(event)" class="flex gap-2 mb-6">
+        <input type="text" id="colaborador-nome" required placeholder="Nome do colaborador" class="flex-1 p-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary" />
+        <button type="submit" class="px-4 py-2 bg-primary hover:bg-brand-wine text-white rounded-lg font-bold text-sm whitespace-nowrap">
+          + Adicionar
+        </button>
+      </form>
+
+      <!-- Lista de Colaboradores -->
+      <div class="max-h-60 overflow-y-auto border border-border rounded-lg divide-y divide-border">
+        <table class="w-full text-sm text-left">
+          <thead class="bg-gray-100 text-xs font-bold uppercase text-text-muted">
+            <tr>
+              <th class="p-2">Nome</th>
+              <th class="p-2 text-center">Status</th>
+              <th class="p-2 text-right">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="lista-colaboradores-tbody">
+            <tr><td colspan="3" class="p-4 text-center text-text-muted">Nenhum colaborador cadastrado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Nova / Edição Ordem de Produção (OP) -->
+  <div id="modal-nova-op" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-surface rounded-xl max-w-2xl w-full p-6 shadow-2xl border border-border relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeModal('modal-nova-op')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
+      <h3 id="modal-op-title" class="text-xl font-bold font-serif text-brand-ink mb-4">Nova Ordem de Produção (OP)</h3>
+
+      <form id="form-nova-op" onsubmit="handleSalvarOp(event)" class="flex flex-col gap-4">
+        <input type="hidden" id="edit-op-id" value="" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Número da OP *</label>
+            <input type="text" id="op-numero" required placeholder="Ex: OP-2026-001" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Data Local *</label>
+            <input type="date" id="op-data" required class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Responsável *</label>
+            <select id="op-responsavel" required class="w-full p-2 border border-border rounded-lg text-sm">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-brand-ink mb-1">Observações</label>
+          <textarea id="op-observacoes" rows="2" placeholder="Observações gerais da OP..." class="w-full p-2 border border-border rounded-lg text-sm"></textarea>
+        </div>
+
+        <div id="op-situacao-container" class="hidden">
+          <label class="block text-xs font-bold text-brand-ink mb-1">Situação da OP</label>
+          <select id="op-situacao" class="w-full p-2 border border-border rounded-lg text-sm">
+            <option value="rascunho">Rascunho</option>
+            <option value="em_producao">Em Produção</option>
+            <option value="concluida">Concluída</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+        </div>
+
+        <!-- Sabores Section -->
+        <div class="border-t border-border pt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-sm text-brand-ink">Sabores e Quantidades Planejadas (kg) *</h4>
+            <button type="button" onclick="adicionarLinhaSaborOp()" class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">add</span> + Adicionar Sabor
+            </button>
+          </div>
+
+          <div id="container-sabores-op" class="flex flex-col gap-2">
+            <!-- Dynamic rows inserted via JS -->
+          </div>
+
+          <div class="mt-3 text-right text-xs font-bold text-brand-ink">
+            Total Calculado: <span id="op-total-calculado" class="text-primary text-sm font-extrabold">0,000 kg</span>
+          </div>
+        </div>
+
+        <div id="op-error-msg" class="hidden text-xs text-error-text bg-error-bg p-2.5 rounded font-semibold"></div>
+
+        <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-border">
+          <button type="button" onclick="closeModal('modal-nova-op')" class="px-4 py-2 border border-border rounded-lg text-sm font-semibold hover:bg-gray-100">Cancelar</button>
+          <button type="submit" id="btn-submit-op" class="px-5 py-2 bg-primary hover:bg-brand-wine text-white rounded-lg text-sm font-bold shadow">Salvar OP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: Nova Batelada -->
+  <div id="modal-nova-batelada" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-surface rounded-xl max-w-xl w-full p-6 shadow-2xl border border-border relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeModal('modal-nova-batelada')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
+      <h3 id="modal-batelada-title" class="text-xl font-bold font-serif text-brand-ink mb-4">Nova Batelada de Temperos</h3>
+
+      <form id="form-nova-batelada" onsubmit="handleSalvarBatelada(event)" class="flex flex-col gap-4">
+        <input type="hidden" id="batelada-id" value="" />
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Nº Batelada *</label>
+            <input type="number" id="batelada-numero" required min="1" placeholder="1" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Lote *</label>
+            <input type="text" id="batelada-lote" required placeholder="Ex: LOT-01" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Carne (kg) *</label>
+            <input type="number" step="0.001" id="batelada-carne-kg" required min="0.001" max="150" placeholder="120.000" oninput="calcularTotalBatelada()" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Temperos Total (kg) *</label>
+            <input type="number" step="0.001" id="batelada-temperos-kg" required min="0" max="150" placeholder="5.500" oninput="calcularTotalBatelada()" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+        </div>
+
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center text-xs font-bold text-amber-900">
+          <span>Peso Total da Batelada (Carne + Temperos):</span>
+          <span id="batelada-total-display" class="text-sm font-extrabold text-primary">0,000 kg</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-brand-ink mb-1">Detalhamento dos Temperos (Texto em linhas)</label>
+          <textarea id="batelada-temperos-desc" rows="3" placeholder="Ex: Sal 2kg, Pimenta 100g, Alho 300g..." class="w-full p-2 border border-border rounded-lg text-sm font-mono text-xs"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 border-t border-border pt-3">
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Resp. Separação</label>
+            <select id="batelada-resp-separacao" class="w-full p-2 border border-border rounded-lg text-sm">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Resp. Recebimento</label>
+            <select id="batelada-resp-recebimento" class="w-full p-2 border border-border rounded-lg text-sm">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-4 border-t border-border pt-3">
+          <label class="flex items-center gap-2 text-xs font-bold text-brand-ink cursor-pointer">
+            <input type="checkbox" id="batelada-separado" class="w-4 h-4 text-primary rounded" /> Separado
+          </label>
+          <label class="flex items-center gap-2 text-xs font-bold text-brand-ink cursor-pointer">
+            <input type="checkbox" id="batelada-recebido" class="w-4 h-4 text-primary rounded" /> Recebido (Exige Separado)
+          </label>
+        </div>
+
+        <div class="border-t border-border pt-3">
+          <label class="block text-xs font-bold text-brand-ink mb-1">Início da Cura (Opcional)</label>
+          <input type="datetime-local" id="batelada-inicio-cura" class="w-full p-2 border border-border rounded-lg text-sm" />
+          <p class="text-[11px] text-text-muted mt-1">A previsão informativa de término é Início + 12 horas.</p>
+        </div>
+
+        <div id="batelada-error-msg" class="hidden text-xs text-error-text bg-error-bg p-2.5 rounded font-semibold"></div>
+
+        <div class="flex justify-end gap-2 mt-2 pt-3 border-t border-border">
+          <button type="button" onclick="closeModal('modal-nova-batelada')" class="px-4 py-2 border border-border rounded-lg text-sm font-semibold hover:bg-gray-100">Cancelar</button>
+          <button type="submit" id="btn-submit-batelada" class="px-5 py-2 bg-primary hover:bg-brand-wine text-white rounded-lg text-sm font-bold shadow">Salvar Batelada</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 5: Novo Pedido de Atacado -->
+  <div id="modal-novo-pedido" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-surface rounded-xl max-w-2xl w-full p-6 shadow-2xl border border-border relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeModal('modal-novo-pedido')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold">✕</button>
+      <h3 id="modal-pedido-title" class="text-xl font-bold font-serif text-brand-ink mb-4">Novo Pedido de Cliente de Atacado</h3>
+
+      <form id="form-novo-pedido" onsubmit="handleSalvarPedido(event)" class="flex flex-col gap-4">
+        <input type="hidden" id="edit-pedido-id" value="" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Nº Pedido *</label>
+            <input type="text" id="pedido-numero" required placeholder="Ex: PED-2026-001" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">OP Vinculada *</label>
+            <select id="pedido-ordem-id" required onchange="carregarSaboresParaPedido(this.value)" class="w-full p-2 border border-border rounded-lg text-sm">
+              <option value="">Selecione a OP...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Data *</label>
+            <input type="date" id="pedido-data" required class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Cliente de Atacado *</label>
+            <input type="text" id="pedido-cliente" required placeholder="Nome / Razão Social do Cliente" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-ink mb-1">Destino / Cidade</label>
+            <input type="text" id="pedido-destino" placeholder="Ex: Loja Matriz / São Paulo" class="w-full p-2 border border-border rounded-lg text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-brand-ink mb-1">Observações</label>
+          <textarea id="pedido-observacoes" rows="2" placeholder="Observações do pedido..." class="w-full p-2 border border-border rounded-lg text-sm"></textarea>
+        </div>
+
+        <div id="pedido-situacao-container" class="hidden">
+          <label class="block text-xs font-bold text-brand-ink mb-1">Situação do Pedido</label>
+          <select id="pedido-situacao" class="w-full p-2 border border-border rounded-lg text-sm">
+            <option value="rascunho">Rascunho</option>
+            <option value="separado">Separado</option>
+            <option value="expedido">Expedido</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+
+        <!-- Itens do Pedido -->
+        <div class="border-t border-border pt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-sm text-brand-ink">Itens Solicitados (Sabores da OP) *</h4>
+            <button type="button" onclick="adicionarLinhaItemPedido()" class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">add</span> + Adicionar Item
+            </button>
+          </div>
+
+          <div id="container-itens-pedido" class="flex flex-col gap-2">
+            <!-- Dynamic rows inserted via JS -->
+          </div>
+        </div>
+
+        <div id="pedido-error-msg" class="hidden text-xs text-error-text bg-error-bg p-2.5 rounded font-semibold"></div>
+
+        <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-border">
+          <button type="button" onclick="closeModal('modal-novo-pedido')" class="px-4 py-2 border border-border rounded-lg text-sm font-semibold hover:bg-gray-100">Cancelar</button>
+          <button type="submit" id="btn-submit-pedido" class="px-5 py-2 bg-primary hover:bg-brand-wine text-white rounded-lg text-sm font-bold shadow">Salvar Pedido</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Main JavaScript -->
+  <script src="./app.js"></script>
+</body>
+</html>

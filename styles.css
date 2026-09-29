@@ -1,0 +1,63 @@
+/* Estilos globais e regras de impressão para Controle de Produção Simples */
+
+:root {
+  --brand-gold: #D99311;
+  --brand-red: #D90404;
+  --brand-red-dark: #8C0303;
+  --brand-wine: #590202;
+  --brand-ink: #260101;
+  --surface: #FFFFFF;
+  --page: #F8F6F4;
+  --border: #E8E1DF;
+  --text: #260101;
+  --text-muted: #5C5150;
+  --success: #176B45;
+  --info: #205A85;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--page);
+  color: var(--brand-ink);
+  min-height: 100vh;
+}
+
+.font-serif {
+  font-family: 'Source Serif 4', Georgia, serif;
+}
+
+/* Ocultar elementos quando inativos */
+.hidden {
+  display: none !important;
+}
+
+/* Transições de animação suaves */
+.transition-all {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Estilização para impressão */
+@media print {
+  aside, header, .no-print, button, input[type="submit"] {
+    display: none !important;
+  }
+  .pl-64 {
+    padding-left: 0 !important;
+  }
+  main {
+    padding: 0 !important;
+    padding-top: 0 !important;
+  }
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  .shadow-sm, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+  }
+  .border {
+    border-color: #ccc !important;
+  }
+}
