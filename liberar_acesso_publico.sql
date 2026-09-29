@@ -1,10 +1,15 @@
 -- LIBERAR ACESSO PÚBLICO (SEM LOGIN) — MIGRAÇÃO INCREMENTAL
 -- Execute este arquivo UMA VEZ no SQL Editor do Supabase para atualizar o banco existente.
--- Não apaga tabelas nem dados existentes.
+-- Permite leitura, inclusão e alteração para visitantes (papel anon) sem necessitar de login ou senhas.
+-- Não apaga tabelas nem dados existentes. Não concede DELETE.
 
 BEGIN;
 
--- 1. Permissões de tabela para os papéis anon e authenticated
+-- 1. Permissões de esquema e sequências
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+
+-- 2. Permissões de tabela para anon e authenticated
 GRANT SELECT, INSERT, UPDATE ON public.colaborador TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.ordem_producao TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.ordem_sabor TO anon, authenticated;
@@ -12,13 +17,16 @@ GRANT SELECT, INSERT, UPDATE ON public.batelada TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.pedido TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.pedido_item TO anon, authenticated;
 
--- 2. Atualizar políticas RLS para acesso aberto (sem login)
+-- 3. Atualizar e garantir Políticas RLS públicas para anon e authenticated
 DO $$
 DECLARE nome text;
 BEGIN
   FOREACH nome IN ARRAY ARRAY['colaborador','ordem_producao','ordem_sabor','batelada','pedido','pedido_item']
   LOOP
-    -- Remover políticas antigas se existirem
+    -- Garantir RLS ativo
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', nome);
+
+    -- Remover políticas restritivas antigas ou duplicadas se existirem
     EXECUTE format('DROP POLICY IF EXISTS equipe_leitura ON public.%I', nome);
     EXECUTE format('DROP POLICY IF EXISTS equipe_inclusao ON public.%I', nome);
     EXECUTE format('DROP POLICY IF EXISTS equipe_alteracao ON public.%I', nome);
@@ -26,14 +34,16 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS acesso_publico_inclusao ON public.%I', nome);
     EXECUTE format('DROP POLICY IF EXISTS acesso_publico_alteracao ON public.%I', nome);
 
-    -- Criar novas políticas públicas para anon e authenticated
+    -- Criar novas políticas públicas abertas para anon e authenticated
     EXECUTE format('CREATE POLICY acesso_publico_leitura ON public.%I FOR SELECT TO anon, authenticated USING (true)', nome);
     EXECUTE format('CREATE POLICY acesso_publico_inclusao ON public.%I FOR INSERT TO anon, authenticated WITH CHECK (true)', nome);
     EXECUTE format('CREATE POLICY acesso_publico_alteracao ON public.%I FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true)', nome);
   END LOOP;
 END $$;
 
--- 3. Atualizar função fn_criar_ordem_producao sem verificação de login
+-- 4. Funções RPC abertas (sem restrição de login)
+
+-- RPC fn_criar_ordem_producao
 CREATE OR REPLACE FUNCTION public.fn_criar_ordem_producao(
   p_numero text, p_data date, p_responsavel text, p_observacoes text, p_sabores jsonb
 )
@@ -62,7 +72,7 @@ END $$;
 
 GRANT EXECUTE ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) TO anon, authenticated;
 
--- 4. Atualizar função fn_criar_pedido sem verificação de login
+-- RPC fn_criar_pedido
 CREATE OR REPLACE FUNCTION public.fn_criar_pedido(
   p_numero text, p_ordem_id uuid, p_cliente text, p_data date,
   p_destino text, p_observacoes text, p_itens jsonb

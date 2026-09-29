@@ -136,6 +136,10 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Permissões de esquema e sequências
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+
 -- RLS habilitado com acesso público para anon e authenticated (sem login)
 DO $$
 DECLARE nome text;

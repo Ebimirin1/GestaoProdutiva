@@ -92,7 +92,7 @@ function router() {
   if (activeScreen === 'expedicao') loadExpedicaoData();
 }
 
-// Helpers para exibição de alertas globais
+// Helpers para exibição de alertas globais e formatação de erros
 function showGlobalAlert(msg) {
   const banner = document.getElementById('global-alert-banner');
   const text = document.getElementById('global-alert-message');
@@ -105,6 +105,17 @@ function showGlobalAlert(msg) {
 function hideGlobalAlert() {
   const banner = document.getElementById('global-alert-banner');
   if (banner) banner.classList.add('hidden');
+}
+
+function formatErrorMessage(err) {
+  if (!err) return 'Ocorreu um erro desconhecido.';
+  const code = err.code || '';
+  const message = err.message || String(err);
+
+  if (code === '42501' || message.includes('permission denied')) {
+    return 'Erro de permissão no Supabase (42501): O banco ainda não possui permissão de acesso aberto. Execute o arquivo "liberar_acesso_publico.sql" no SQL Editor do seu projeto Supabase.';
+  }
+  return message;
 }
 
 // ============================================================================
@@ -120,7 +131,12 @@ async function loadColaboradores() {
       .select('*')
       .order('nome');
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42501') {
+        showGlobalAlert(formatErrorMessage(error));
+      }
+      throw error;
+    }
     colaboradoresList = data || [];
     renderColaboradoresList();
     populateColaboradorDropdowns();
@@ -188,7 +204,7 @@ async function handleSalvarColaborador(e) {
     nomeInput.value = '';
     await loadColaboradores();
   } catch (err) {
-    alert('Erro ao salvar colaborador: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
@@ -202,7 +218,7 @@ async function toggleStatusColaborador(id, novoStatus) {
     if (error) throw error;
     await loadColaboradores();
   } catch (err) {
-    alert('Erro ao atualizar colaborador: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
@@ -249,7 +265,7 @@ async function loadPlanejamentoData() {
     updatePlanejamentoStats();
   } catch (err) {
     console.error('Erro ao carregar Planejamento:', err);
-    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-error-text font-semibold">Erro ao carregar OPs: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-error-text font-semibold">${escapeHtml(formatErrorMessage(err))}</td></tr>`;
   }
 }
 
@@ -486,7 +502,7 @@ async function handleSalvarOp(e) {
     closeModal('modal-nova-op');
     await loadPlanejamentoData();
   } catch (err) {
-    showOpError(err.message || 'Erro ao salvar Ordem de Produção.');
+    showOpError(formatErrorMessage(err));
   } finally {
     btnSubmit.disabled = false;
     btnSubmit.textContent = 'Salvar OP';
@@ -511,7 +527,7 @@ async function cancelarOp(opId) {
     if (error) throw error;
     await loadPlanejamentoData();
   } catch (err) {
-    alert('Erro ao cancelar OP: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
@@ -817,7 +833,7 @@ async function handleSalvarEmbutimentoSabor(e, saborId) {
     if (error) throw error;
     await renderProducaoDetachedOpData(selectedProducaoOpId);
   } catch (err) {
-    alert('Erro ao salvar dados de embutimento: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
@@ -865,7 +881,7 @@ async function openEditBateladaModal(bateladaId) {
     calcularTotalBatelada();
     openModal('modal-nova-batelada');
   } catch (err) {
-    alert('Erro ao carregar dados da batelada: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
@@ -957,7 +973,7 @@ async function handleSalvarBatelada(e) {
     closeModal('modal-nova-batelada');
     await renderProducaoDetachedOpData(selectedProducaoOpId);
   } catch (err) {
-    showBateladaError(err.message || 'Erro ao salvar batelada.');
+    showBateladaError(formatErrorMessage(err));
   } finally {
     btnSubmit.disabled = false;
     btnSubmit.textContent = 'Salvar Batelada';
@@ -1254,7 +1270,7 @@ async function openEditPedidoModal(pedidoId) {
 
     openModal('modal-novo-pedido');
   } catch (err) {
-    alert('Erro ao carregar pedido: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
@@ -1354,7 +1370,7 @@ async function handleSalvarPedido(e) {
     closeModal('modal-novo-pedido');
     await loadExpedicaoData();
   } catch (err) {
-    showPedidoError(err.message || 'Erro ao salvar pedido.');
+    showPedidoError(formatErrorMessage(err));
   } finally {
     btnSubmit.disabled = false;
     btnSubmit.textContent = 'Salvar Pedido';
@@ -1379,7 +1395,7 @@ async function cancelarPedido(pedidoId) {
     if (error) throw error;
     await loadExpedicaoData();
   } catch (err) {
-    alert('Erro ao cancelar pedido: ' + (err.message || err));
+    alert(formatErrorMessage(err));
   }
 }
 
