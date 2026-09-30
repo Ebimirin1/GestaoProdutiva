@@ -53,7 +53,7 @@ Stack obrigatória: HTML, CSS, JavaScript puro, Supabase e GitHub Pages.
 | Arquivos alterados | `config.js`, `index.html`, `app.js`, `restaurar_acesso_admin.sql`, `schema.sql`, `spec.md`, `AGENTS.md`, `README.md`, `task.md` |
 | Teste local executado | Testes JS de cálculo de saldo, roteador de 4 telas, login e sessão |
 | Teste no Supabase executado ou pendente | Conexão verificada com `ydvgbfbrkdfdtclbfqtc.supabase.co`. Resta executar `restaurar_acesso_admin.sql` no SQL Editor |
-| SQL a executar, se houver | Executar `restaurar_acesso_admin.sql` no SQL Editor do Supabase |
+| SQL a executar, se houver | Executar `gerar_bateladas_automaticas.sql` no SQL Editor do Supabase para registrar `fn_atualizar_ordem_producao` |
 | PR/branch publicada | Branch `jules-6857193963919618962-d46122fc` com PR para `main` |
 | Merge efetuado ou pendente | Pendente de revisão e clique no botão "Publish PR" / Merge pelo usuário |
 | Pages publicado e verificado ou pendente | Pendente do merge na `main` e ativação em Settings -> Pages |

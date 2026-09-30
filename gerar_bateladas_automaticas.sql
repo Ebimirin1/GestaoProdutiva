@@ -1,5 +1,6 @@
 -- CONTROLE DE PRODUÇÃO SIMPLES — Migração Incremental: Geração Automática de Bateladas
 -- Permite a criação e atualização atômica de Ordens de Produção (OP) com bateladas divididas em 95% carne e 5% tempero (máx 150,000 kg).
+-- Execute todo este script no SQL Editor do projeto Supabase para registrar as funções RPC no cache do PostgREST.
 
 BEGIN;
 
@@ -94,7 +95,7 @@ END $$;
 REVOKE ALL ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) TO authenticated;
 
--- 3. Função RPC para atualizar OP e recalcular bateladas com verificação de produção em andamento
+-- 3. Função RPC principal para atualizar OP (p_id uuid)
 CREATE OR REPLACE FUNCTION public.fn_atualizar_ordem_producao(
   p_id uuid, p_numero text, p_data date, p_responsavel text, p_situacao text, p_observacoes text, p_sabores jsonb
 )
@@ -156,4 +157,19 @@ END $$;
 REVOKE ALL ON FUNCTION public.fn_atualizar_ordem_producao(uuid,text,date,text,text,text,jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_atualizar_ordem_producao(uuid,text,date,text,text,text,jsonb) TO authenticated;
 
+-- 4. Sobrecarga de conveniência para fn_atualizar_ordem_producao aceitando p_id como text
+CREATE OR REPLACE FUNCTION public.fn_atualizar_ordem_producao(
+  p_id text, p_numero text, p_data date, p_responsavel text, p_situacao text, p_observacoes text, p_sabores jsonb
+)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+BEGIN
+  PERFORM public.fn_atualizar_ordem_producao(p_id::uuid, p_numero, p_data, p_responsavel, p_situacao, p_observacoes, p_sabores);
+END $$;
+
+REVOKE ALL ON FUNCTION public.fn_atualizar_ordem_producao(text,text,date,text,text,text,jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_atualizar_ordem_producao(text,text,date,text,text,text,jsonb) TO authenticated;
+
 COMMIT;
+
+-- Recarregar cache de esquema do PostgREST
+NOTIFY pgrst, 'reload schema';
