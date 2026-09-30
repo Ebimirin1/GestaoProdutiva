@@ -13,7 +13,7 @@ Para autorizar o usuário administrador e ativar/atualizar as funções RPC no b
 1. Abra o painel do seu projeto no Supabase (`https://supabase.com`).
 2. Acesse **SQL Editor** → **New query**.
 3. **1º Passo:** Copie todo o conteúdo do arquivo `restaurar_acesso_admin.sql` e clique em **Run** (caso precise autorizar o admin UID).
-4. **2º Passo:** Copie todo o conteúdo do arquivo `gerar_bateladas_automaticas.sql` e clique em **Run** (para criar/atualizar as funções atômicas de bateladas `fn_criar_ordem_producao` e `fn_atualizar_ordem_producao`).
+4. **2º Passo:** Copie todo o conteúdo do arquivo `gerar_bateladas_automaticas.sql` e clique em **Run** (para criar/atualizar as funções atômicas de bateladas e permitir atualização de situação de OP como "rascunho" -> "em_producao").
 
 ## Instruções para um Novo Banco no Supabase
 
