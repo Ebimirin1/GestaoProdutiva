@@ -55,6 +55,7 @@ CREATE TABLE public.ordem_sabor (
   insumos_descricao text NOT NULL DEFAULT '',
   responsavel_insumos text NOT NULL DEFAULT '',
   insumos_separados boolean NOT NULL DEFAULT false,
+  concluido boolean NOT NULL DEFAULT false,
   lote text NOT NULL DEFAULT '',
   validade date,
   criado_em timestamptz NOT NULL DEFAULT now(),
@@ -168,6 +169,78 @@ BEGIN
     EXECUTE format('CREATE POLICY equipe_alteracao ON public.%I FOR UPDATE TO authenticated USING ((SELECT public.tem_acesso())) WITH CHECK ((SELECT public.tem_acesso()))', nome);
   END LOOP;
 END $$;
+
+-- Função de trigger para atualizar o status geral da OP automaticamente
+CREATE OR REPLACE FUNCTION public.fn_atualizar_status_op_automatico()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_ordem_id uuid;
+  v_situacao_atual text;
+  v_total_sabores integer := 0;
+  v_sabores_concluidos integer := 0;
+  v_tem_sabor_iniciado boolean := false;
+  v_tem_batelada_iniciada boolean := false;
+BEGIN
+  IF TG_TABLE_NAME = 'ordem_sabor' THEN
+    v_ordem_id := coalesce(NEW.ordem_id, OLD.ordem_id);
+  ELSIF TG_TABLE_NAME = 'batelada' THEN
+    v_ordem_id := coalesce(NEW.ordem_id, OLD.ordem_id);
+  END IF;
+
+  IF v_ordem_id IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT situacao INTO v_situacao_atual
+  FROM public.ordem_producao
+  WHERE id = v_ordem_id;
+
+  IF v_situacao_atual = 'cancelada' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT
+    count(*),
+    count(*) FILTER (WHERE concluido = true),
+    bool_or(concluido = true OR embutido_kg IS NOT NULL OR insumos_separados = true)
+  INTO v_total_sabores, v_sabores_concluidos, v_tem_sabor_iniciado
+  FROM public.ordem_sabor
+  WHERE ordem_id = v_ordem_id;
+
+  IF v_total_sabores = 0 THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT bool_or(separado = true OR recebido = true OR inicio_cura IS NOT NULL)
+  INTO v_tem_batelada_iniciada
+  FROM public.batelada
+  WHERE ordem_id = v_ordem_id;
+
+  IF v_sabores_concluidos = v_total_sabores THEN
+    UPDATE public.ordem_producao
+    SET situacao = 'concluida'
+    WHERE id = v_ordem_id AND situacao IS DISTINCT FROM 'concluida';
+  ELSIF coalesce(v_tem_sabor_iniciado, false) OR coalesce(v_tem_batelada_iniciada, false) THEN
+    UPDATE public.ordem_producao
+    SET situacao = 'em_producao'
+    WHERE id = v_ordem_id AND situacao IS DISTINCT FROM 'em_producao';
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END $$;
+
+REVOKE ALL ON FUNCTION public.fn_atualizar_status_op_automatico() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_atualizar_status_op_automatico() TO authenticated;
+
+DROP TRIGGER IF EXISTS trg_atualizar_status_op_sabor ON public.ordem_sabor;
+CREATE TRIGGER trg_atualizar_status_op_sabor
+  AFTER INSERT OR UPDATE OR DELETE ON public.ordem_sabor
+  FOR EACH ROW EXECUTE FUNCTION public.fn_atualizar_status_op_automatico();
+
+DROP TRIGGER IF EXISTS trg_atualizar_status_op_batelada ON public.batelada;
+CREATE TRIGGER trg_atualizar_status_op_batelada
+  AFTER INSERT OR UPDATE OR DELETE ON public.batelada
+  FOR EACH ROW EXECUTE FUNCTION public.fn_atualizar_status_op_automatico();
 
 -- Função interna para geração automática de bateladas
 CREATE OR REPLACE FUNCTION public.fn_gerar_bateladas_op(p_ordem_id uuid, p_numero text)

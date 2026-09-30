@@ -53,7 +53,11 @@ Em `config.js`, usar `window.APP_CONFIG = { supabaseUrl: '...', supabasePublisha
 
 ### Tela 2 — Produção
 - Seção A: Bateladas e Temperos geradas automaticamente (limite de 150 kg por batelada, exibe número, carne kg, tempero kg e total kg, marcações Separado/Recebido, início da cura + 12h de previsão).
-- Seção B: Insumos e Embutimento por Sabor (diferença em kg e %, distinção de NULL "Não informado" para 0 kg).
+- Seção B: Insumos e Embutimento por Sabor (diferença em kg e %, distinção de NULL "Não informado" para 0 kg, e ação de conclusão individual por sabor).
+- Automação de Status da OP:
+  * Quando qualquer sabor ou batelada for iniciado, o status geral da OP muda automaticamente para "Em produção".
+  * Quando todos os sabores da OP forem marcados como concluídos (`concluido = true`), o status geral da OP muda automaticamente para "Concluída".
+  * O status "Cancelada" é sempre preservado e OPs sem sabores não são concluídas automaticamente.
 
 ### Tela 3 — Expedição
 - Pedidos de cliente de atacado vinculados a OPs via RPC `fn_criar_pedido`.
