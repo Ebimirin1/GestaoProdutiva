@@ -21,6 +21,6 @@ HTML + CSS + JavaScript puro; Supabase PostgreSQL/Auth/cliente JS; GitHub Pages.
 ## Resumo das quatro telas
 
 1. **Planejamento:** OPs, quantidades por sabor, modal de colaboradores.
-2. **Produção:** Bateladas (máx. 150 kg), temperos, insumos e embutimento.
+2. **Produção:** Bateladas geradas automaticamente (95% carne / 5% tempero, máx. 150 kg cada), temperos, insumos e embutimento.
 3. **Expedição:** Pedidos de atacado e separação por cliente.
 4. **Saldo da Loja:** Resumo geral por sabor (planejado, embutido real, separado atacado, saldo estimado para a loja = embutido - separado).

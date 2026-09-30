@@ -22,13 +22,14 @@ Stack obrigatória: HTML, CSS, JavaScript puro, Supabase e GitHub Pages.
 ## T2 — Planejamento
 
 - [x] Modal de colaboradores (nome, ativo/inativo).
-- [x] Lista de OPs e formulário de criação com uma linha por sabor via RPC `fn_criar_ordem_producao`.
-- [x] Editar cabeçalho/linhas e cancelar OP sem apagar histórico.
+- [x] Lista de OPs e formulário de criação com uma linha por sabor via RPC `fn_criar_ordem_producao`. Geração automática de bateladas (95% carne e 5% tempero, limite de 150 kg).
+- [x] Editar cabeçalho/linhas via RPC `fn_atualizar_ordem_producao` com regeneração automática de bateladas e bloqueio preventivo quando houver apontamentos em andamento.
+- [x] Cancelar OP sem apagar histórico.
 
 ## T3 — Produção
 
 - [x] Seleção da OP e seções recolhíveis Bateladas e Insumos/Embutimento.
-- [x] Bateladas <= 150 kg, marcações Separado/Recebido, início de cura +12h.
+- [x] Bateladas <= 150 kg geradas automaticamente (exibindo nº batelada, lote, carne kg, tempero kg e total kg), marcações Separado/Recebido, início de cura +12h.
 - [x] Insumos e Embutimento por Sabor (diferença kg e %, distinção de NULL "Não informado" para 0 kg).
 
 ## T4 — Expedição

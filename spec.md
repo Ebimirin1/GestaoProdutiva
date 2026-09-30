@@ -47,11 +47,12 @@ Em `config.js`, usar `window.APP_CONFIG = { supabaseUrl: '...', supabasePublisha
 
 ### Tela 1 — Planejamento
 - Ordens de Produção (OP) com número, data, responsável, situação e total planejado.
-- Criar OP via RPC `fn_criar_ordem_producao` com pelo menos um sabor.
+- Criar OP via RPC `fn_criar_ordem_producao` com pelo menos um sabor. A criação gera automaticamente as bateladas sequenciais de 95% carne e 5% tempero (máx 150,000 kg).
+- Edição de OP via RPC `fn_atualizar_ordem_producao` regenera automaticamente as bateladas caso não haja produção/apontamentos em andamento. Se houver apontamentos, a alteração é impedida e o usuário é notificado.
 - Modal de colaboradores (nome, ativo/inativo).
 
 ### Tela 2 — Produção
-- Seção A: Bateladas e Temperos (limite de 150 kg por batelada, marcações Separado/Recebido, início da cura + 12h de previsão).
+- Seção A: Bateladas e Temperos geradas automaticamente (limite de 150 kg por batelada, exibe número, carne kg, tempero kg e total kg, marcações Separado/Recebido, início da cura + 12h de previsão).
 - Seção B: Insumos e Embutimento por Sabor (diferença em kg e %, distinção de NULL "Não informado" para 0 kg).
 
 ### Tela 3 — Expedição
