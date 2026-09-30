@@ -1,10 +1,13 @@
--- CONTROLE DE PRODUÇÃO SIMPLES — Migração Incremental: Geração Automática de Bateladas
--- Permite a criação e atualização atômica de Ordens de Produção (OP) com bateladas divididas em 95% carne e 5% tempero (máx 150,000 kg).
--- Execute todo este script no SQL Editor do projeto Supabase para registrar as funções RPC no cache do PostgREST.
+-- CONTROLE DE PRODUÇÃO SIMPLES — Migração Incremental: Ajuste da Atualização de OP e Bateladas
+-- Execute todo este script no SQL Editor do seu projeto Supabase para aplicar a correção de ponta a ponta.
 
 BEGIN;
 
--- 1. Função interna para geração automática de bateladas
+-- 1. Remover assinaturas e sobrecargas anteriores de fn_atualizar_ordem_producao para limpar o cache do PostgREST
+DROP FUNCTION IF EXISTS public.fn_atualizar_ordem_producao(text, text, date, text, text, text, jsonb);
+DROP FUNCTION IF EXISTS public.fn_atualizar_ordem_producao(uuid, text, date, text, text, text, jsonb);
+
+-- 2. Função interna para geração automática de bateladas (caso ainda não existam)
 CREATE OR REPLACE FUNCTION public.fn_gerar_bateladas_op(p_ordem_id uuid, p_numero text)
 RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
@@ -54,7 +57,7 @@ END $$;
 REVOKE ALL ON FUNCTION public.fn_gerar_bateladas_op(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_gerar_bateladas_op(uuid, text) TO authenticated;
 
--- 2. Atualizar fn_criar_ordem_producao com geração de bateladas
+-- 3. Atualizar fn_criar_ordem_producao com geração automática de bateladas
 CREATE OR REPLACE FUNCTION public.fn_criar_ordem_producao(
   p_numero text, p_data date, p_responsavel text, p_observacoes text, p_sabores jsonb
 )
@@ -86,7 +89,6 @@ BEGIN
       VALUES (v_id, btrim(v_sabor->>'nome'), (v_sabor->>'planejado_kg')::numeric);
   END LOOP;
 
-  -- Gerar bateladas automaticamente
   PERFORM public.fn_gerar_bateladas_op(v_id, p_numero);
 
   RETURN v_id;
@@ -95,13 +97,18 @@ END $$;
 REVOKE ALL ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_criar_ordem_producao(text,date,text,text,jsonb) TO authenticated;
 
--- 3. Função RPC principal para atualizar OP (p_id uuid)
+-- 4. Nova implementação única de fn_atualizar_ordem_producao
+-- Atualiza a OP e os sabores mantendo as bateladas existentes e apontamentos intactos.
 CREATE OR REPLACE FUNCTION public.fn_atualizar_ordem_producao(
   p_id uuid, p_numero text, p_data date, p_responsavel text, p_situacao text, p_observacoes text, p_sabores jsonb
 )
 RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
   v_sabor jsonb;
+  v_sabor_id uuid;
+  v_nome text;
+  v_planejado numeric(12,3);
+  v_sabores_enviados_ids uuid[] := '{}';
 BEGIN
   IF NOT public.tem_acesso() THEN
     RAISE EXCEPTION 'Usuário sem autorização.' USING ERRCODE = '42501';
@@ -113,21 +120,7 @@ BEGIN
     RAISE EXCEPTION 'Informe pelo menos um sabor.' USING ERRCODE = '22023';
   END IF;
 
-  -- Verificar se já existem registros em andamento
-  IF EXISTS (
-    SELECT 1 FROM public.batelada
-    WHERE ordem_id = p_id AND (separado OR recebido OR inicio_cura IS NOT NULL)
-  ) OR EXISTS (
-    SELECT 1 FROM public.ordem_sabor
-    WHERE ordem_id = p_id AND (embutido_kg IS NOT NULL OR insumos_separados)
-  ) OR EXISTS (
-    SELECT 1 FROM public.pedido
-    WHERE ordem_id = p_id AND situacao != 'cancelado'
-  ) THEN
-    RAISE EXCEPTION 'Não é possível recalcular as bateladas da OP porque já existem apontamentos de produção, separação, recebimento ou pedidos em andamento.' USING ERRCODE = '55000';
-  END IF;
-
-  -- Atualizar dados da OP
+  -- 1. Atualizar dados principais da OP (incluindo mudança de situação rascunho -> em_producao / concluida / etc)
   UPDATE public.ordem_producao
     SET numero = btrim(p_numero),
         data = p_data,
@@ -136,40 +129,71 @@ BEGIN
         observacoes = coalesce(p_observacoes, '')
     WHERE id = p_id;
 
-  -- Limpar bateladas e sabores antigos
-  DELETE FROM public.batelada WHERE ordem_id = p_id;
-  DELETE FROM public.ordem_sabor WHERE ordem_id = p_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ordem de produção não encontrada.' USING ERRCODE = 'P0002';
+  END IF;
 
-  -- Recriar sabores
+  -- 2. Upsert dos sabores (preservando registros e FKs)
   FOR v_sabor IN SELECT value FROM jsonb_array_elements(p_sabores)
   LOOP
     IF jsonb_typeof(v_sabor) IS DISTINCT FROM 'object' THEN
       RAISE EXCEPTION 'Cada sabor deve ser um objeto.' USING ERRCODE = '22023';
     END IF;
-    INSERT INTO public.ordem_sabor(ordem_id, nome, planejado_kg)
-      VALUES (p_id, btrim(v_sabor->>'nome'), (v_sabor->>'planejado_kg')::numeric);
+
+    v_nome := btrim(v_sabor->>'nome');
+    v_planejado := (v_sabor->>'planejado_kg')::numeric;
+    v_sabor_id := NULL;
+
+    IF v_sabor->>'id' IS NOT NULL AND (v_sabor->>'id') != '' THEN
+      v_sabor_id := (v_sabor->>'id')::uuid;
+    END IF;
+
+    IF v_sabor_id IS NOT NULL THEN
+      UPDATE public.ordem_sabor
+        SET nome = v_nome,
+            planejado_kg = v_planejado
+        WHERE id = v_sabor_id AND ordem_id = p_id;
+    ELSE
+      -- Tentar buscar por nome para a mesma OP
+      SELECT id INTO v_sabor_id
+      FROM public.ordem_sabor
+      WHERE ordem_id = p_id AND lower(btrim(nome)) = lower(v_nome);
+
+      IF v_sabor_id IS NOT NULL THEN
+        UPDATE public.ordem_sabor
+          SET planejado_kg = v_planejado
+          WHERE id = v_sabor_id;
+      ELSE
+        INSERT INTO public.ordem_sabor(ordem_id, nome, planejado_kg)
+          VALUES (p_id, v_nome, v_planejado)
+          RETURNING id INTO v_sabor_id;
+      END IF;
+    END IF;
+
+    v_sabores_enviados_ids := array_append(v_sabores_enviados_ids, v_sabor_id);
   END LOOP;
 
-  -- Gerar bateladas atualizadas
-  PERFORM public.fn_gerar_bateladas_op(p_id, p_numero);
+  -- 3. Remover sabores retirados que não possuem pedidos ou apontamentos vinculados
+  DELETE FROM public.ordem_sabor
+  WHERE ordem_id = p_id
+    AND NOT (id = ANY(v_sabores_enviados_ids))
+    AND embutido_kg IS NULL
+    AND NOT insumos_separados
+    AND NOT EXISTS (
+      SELECT 1 FROM public.pedido_item WHERE ordem_sabor_id = public.ordem_sabor.id
+    );
+
+  -- 4. Se por algum motivo a OP não possuir bateladas salvas, gerar automaticamente
+  IF NOT EXISTS (SELECT 1 FROM public.batelada WHERE ordem_id = p_id) THEN
+    PERFORM public.fn_gerar_bateladas_op(p_id, p_numero);
+  END IF;
+
 END $$;
 
 REVOKE ALL ON FUNCTION public.fn_atualizar_ordem_producao(uuid,text,date,text,text,text,jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_atualizar_ordem_producao(uuid,text,date,text,text,text,jsonb) TO authenticated;
 
--- 4. Sobrecarga de conveniência para fn_atualizar_ordem_producao aceitando p_id como text
-CREATE OR REPLACE FUNCTION public.fn_atualizar_ordem_producao(
-  p_id text, p_numero text, p_data date, p_responsavel text, p_situacao text, p_observacoes text, p_sabores jsonb
-)
-RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
-BEGIN
-  PERFORM public.fn_atualizar_ordem_producao(p_id::uuid, p_numero, p_data, p_responsavel, p_situacao, p_observacoes, p_sabores);
-END $$;
-
-REVOKE ALL ON FUNCTION public.fn_atualizar_ordem_producao(text,text,date,text,text,text,jsonb) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.fn_atualizar_ordem_producao(text,text,date,text,text,text,jsonb) TO authenticated;
-
 COMMIT;
 
--- Recarregar cache de esquema do PostgREST
+-- Recarregar o cache de esquema do PostgREST para reconhecer a função imediatamente
 NOTIFY pgrst, 'reload schema';

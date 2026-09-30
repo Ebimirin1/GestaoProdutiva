@@ -575,9 +575,8 @@ async function handleSalvarOp(e) {
   btnSubmit.textContent = 'Salvando...';
 
   try {
-    const payloadSabores = saboresArr.map(s => ({ nome: s.nome, planejado_kg: s.planejado_kg }));
-
     if (!editId) {
+      const payloadSabores = saboresArr.map(s => ({ nome: s.nome, planejado_kg: s.planejado_kg }));
       const { data: opId, error } = await supabaseClient.rpc('fn_criar_ordem_producao', {
         p_numero: numero,
         p_data: data,
@@ -589,6 +588,11 @@ async function handleSalvarOp(e) {
       if (error) throw error;
     } else {
       const situacao = document.getElementById('op-situacao').value;
+      const payloadSabores = saboresArr.map(s => ({
+        id: s.id || null,
+        nome: s.nome,
+        planejado_kg: s.planejado_kg
+      }));
 
       const { error } = await supabaseClient.rpc('fn_atualizar_ordem_producao', {
         p_id: editId,
