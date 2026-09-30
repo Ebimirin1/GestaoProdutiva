@@ -575,8 +575,9 @@ async function handleSalvarOp(e) {
   btnSubmit.textContent = 'Salvando...';
 
   try {
+    const payloadSabores = saboresArr.map(s => ({ nome: s.nome, planejado_kg: s.planejado_kg }));
+
     if (!editId) {
-      const payloadSabores = saboresArr.map(s => ({ nome: s.nome, planejado_kg: s.planejado_kg }));
       const { data: opId, error } = await supabaseClient.rpc('fn_criar_ordem_producao', {
         p_numero: numero,
         p_data: data,
@@ -589,27 +590,17 @@ async function handleSalvarOp(e) {
     } else {
       const situacao = document.getElementById('op-situacao').value;
 
-      const { error: errOp } = await supabaseClient
-        .from('ordem_producao')
-        .update({ numero, data, responsavel, observacoes, situacao })
-        .eq('id', editId);
+      const { error } = await supabaseClient.rpc('fn_atualizar_ordem_producao', {
+        p_id: editId,
+        p_numero: numero,
+        p_data: data,
+        p_responsavel: responsavel,
+        p_situacao: situacao,
+        p_observacoes: observacoes,
+        p_sabores: payloadSabores
+      });
 
-      if (errOp) throw errOp;
-
-      for (const s of saboresArr) {
-        if (s.id) {
-          const { error: errSabor } = await supabaseClient
-            .from('ordem_sabor')
-            .update({ nome: s.nome, planejado_kg: s.planejado_kg })
-            .eq('id', s.id);
-          if (errSabor) throw errSabor;
-        } else {
-          const { error: errSabor } = await supabaseClient
-            .from('ordem_sabor')
-            .insert({ ordem_id: editId, nome: s.nome, planejado_kg: s.planejado_kg });
-          if (errSabor) throw errSabor;
-        }
-      }
+      if (error) throw error;
     }
 
     closeModal('modal-nova-op');

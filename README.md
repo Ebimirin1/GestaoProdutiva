@@ -1,6 +1,6 @@
 # Controle de Produção — Versão Simples (Quatro Telas)
 
-Este projeto é um aplicativo web para controle de produção artesanal com quatro telas operacionais: **Planejamento, Produção, Expedição e Saldo da Loja**. Tecnologias: **HTML + CSS + JavaScript + Supabase + GitHub Pages**.
+Este projeto é um aplicativo web para controle de produção artesanal com quatro telas operacionais: **Planejamento, Produção, Expedição e Saldo da Loja**. As bateladas são geradas automaticamente na OP dividindo o total em 95% carne e 5% tempero (máx 150 kg por batelada). Tecnologias: **HTML + CSS + JavaScript + Supabase + GitHub Pages**.
 
 ## Tela Inicial de Login
 
