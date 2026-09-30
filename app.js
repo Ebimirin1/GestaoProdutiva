@@ -872,6 +872,10 @@ function renderEmbutimentoList(sabores) {
             <label class="flex items-center gap-2 font-bold text-brand-ink cursor-pointer mt-1">
               <input type="checkbox" class="sabor-insumos-separados w-4 h-4 text-primary rounded" ${s.insumos_separados ? 'checked' : ''} /> Insumos Separados
             </label>
+            <label class="flex items-center gap-2 font-bold text-brand-ink cursor-pointer mt-1">
+              <input type="checkbox" class="sabor-concluido w-4 h-4 text-emerald-600 rounded" ${s.concluido ? 'checked' : ''} />
+              <span class="${s.concluido ? 'text-emerald-700 font-extrabold' : ''}">✓ Sabor Concluído</span>
+            </label>
           </div>
 
           <div class="flex flex-col gap-2">
@@ -908,6 +912,7 @@ async function handleSalvarEmbutimentoSabor(e, saborId) {
   const insumosDesc = form.querySelector('.sabor-insumos-desc').value.trim();
   const respInsumos = form.querySelector('.sabor-resp-insumos').value;
   const insumosSeparados = form.querySelector('.sabor-insumos-separados').checked;
+  const concluido = form.querySelector('.sabor-concluido').checked;
   const embutidoVal = form.querySelector('.sabor-embutido-kg').value;
   const lote = form.querySelector('.sabor-lote').value.trim();
   const validade = form.querySelector('.sabor-validade').value || null;
@@ -926,6 +931,7 @@ async function handleSalvarEmbutimentoSabor(e, saborId) {
         insumos_descricao: insumosDesc,
         responsavel_insumos: respInsumos,
         insumos_separados: insumosSeparados,
+        concluido: concluido,
         embutido_kg: embutidoKg,
         lote: lote,
         validade: validade
