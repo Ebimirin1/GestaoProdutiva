@@ -1,81 +1,59 @@
-# Plano de execução — MVP de três telas
+# Plano de execução — MVP de quatro telas
 
 Stack obrigatória: HTML, CSS, JavaScript puro, Supabase e GitHub Pages.
 
 ## T0 — Organizar e publicar a base
 
 - [x] Colocar `spec.md`, `AGENTS.md`, `task.md`, `schema.sql` e `README.md` na raiz do repositório escolhido.
-- [x] Extrair o HTML/CSS/imagens do Google Stitch; colocar o HTML inicial em `index.html` na raiz. Não subir o ZIP como substituto dos arquivos.
-- [x] Organizar apenas `index.html`, `styles.css`, `app.js`, `config.js` e `.nojekyll` (vazio); criar pasta de imagens somente se necessária.
-- [x] Implementar menu de três telas por hash, layouts responsivos e caminhos relativos.
+- [x] Extrair o HTML/CSS/imagens do Google Stitch; colocar o HTML inicial em `index.html` na raiz.
+- [x] Organizar apenas `index.html`, `styles.css`, `app.js`, `config.js` e `.nojekyll` (vazio).
+- [x] Implementar menu de quatro telas por hash (`#planejamento`, `#producao`, `#expedicao`, `#saldo-loja`).
+- [x] Implementar tela inicial exclusiva de login por e-mail e senha.
 - [x] Commit + PR da base; publicar a PR no GitHub.
 - [ ] Usuário: ativar Settings → Pages → Deploy from a branch → main → /(root) → Save. Confirmar o link e a execução concluída em Actions.
 
-**Aceite:** site inicial abre pelo link do Pages e F5 nas três seções não dá 404.
-
-## T1 — Novo Supabase e acesso
+## T1 — Supabase Auth e acesso
 
 - [x] Conexão com o projeto Supabase (`ydvgbfbrkdfdtclbfqtc.supabase.co`) configurada em `config.js`.
 - [x] Executar `restaurar_acesso_admin.sql` no Supabase para autorizar o administrador (`UID: fc952189-34d3-4963-b6c6-f408a249a47b`) e ativar RLS.
-- [x] Jules: implementar login/logout, restauração de sessão, verificação `tem_acesso()` e mensagens de falha. Usuário sem acesso não vê dados operacionais.
-- [x] Testar configuração, senha incorreta, usuário não autorizado, login autorizado e logout.
+- [x] Jules: implementar login/logout, restauração de sessão e verificação `tem_acesso()`.
 - [x] Commit + PR, merge e teste no link Pages.
-
-**Aceite:** usuário autorizado entra; visitantes e contas fora da lista não acessam os dados. RLS continua ativo.
 
 ## T2 — Planejamento
 
 - [x] Modal de colaboradores (nome, ativo/inativo).
-- [x] Lista de OPs e formulário de criação com uma linha por sabor.
-- [x] Validar número/data/responsável, pelo menos um sabor, nomes sem duplicidade e kg > 0.
-- [x] Integrar RPC `fn_criar_ordem_producao`; conferir os parâmetros em `schema.sql`.
-- [x] Editar cabeçalho/linhas individualmente, adicionar sabor, mudar situação e cancelar OP sem apagar histórico.
-- [x] Exibir total planejado como soma; preservar data local.
-- [x] Testar uma OP com vários sabores; validação de sabor duplicado/inválido.
-- [x] Commit + PR, merge e teste no Pages.
+- [x] Lista de OPs e formulário de criação com uma linha por sabor via RPC `fn_criar_ordem_producao`.
+- [x] Editar cabeçalho/linhas e cancelar OP sem apagar histórico.
 
 ## T3 — Produção
 
 - [x] Seleção da OP e seções recolhíveis Bateladas e Insumos/Embutimento.
-- [x] Cadastro/edição de bateladas: número, lote, carne_kg, temperos_kg, temperos_descricao, responsáveis e marcações.
-- [x] Total carne + temperos <= 150 kg no formulário e banco. Recebido depende de Separado.
-- [x] Início de cura opcional e previsão informativa +12h.
-- [x] Por sabor: insumos_descricao, responsável, insumos separados, embutido_kg, lote e validade.
-- [x] Diferença em kg e %, sem tolerância arbitrária. Distinguir NULL ("Pendente") de zero.
-- [x] Testar salvamento; rejeição de >150 kg; aceitar 150 kg; responsáveis obrigatórios nas marcações.
-- [x] Commit + PR, merge e teste no Pages.
+- [x] Bateladas <= 150 kg, marcações Separado/Recebido, início de cura +12h.
+- [x] Insumos e Embutimento por Sabor (diferença kg e %, distinção de NULL "Não informado" para 0 kg).
 
 ## T4 — Expedição
 
-- [x] Lista, formulário e edição de pedidos de Cliente de atacado, com uma OP por pedido.
+- [x] Lista, formulário e edição de pedidos de Cliente de atacado via RPC `fn_criar_pedido`.
 - [x] Itens por sabor/conservação; solicitado > 0 e separado de 0 até solicitado.
-- [x] Criação atômica pela RPC `fn_criar_pedido`.
-- [x] Editar registros individualmente, adicionar item, marcar situação/cancelamento.
-- [x] Resumo por sabor: planejado, embutido, solicitado, separado e saldo estimado para loja; excluir pedidos cancelados das somas.
-- [x] Alertar saldo negativo e embutido pendente.
-- [x] Testar duas conservações para o mesmo sabor, cancelamento e recarga.
-- [x] Commit + PR, merge e teste no Pages.
 
-## T5 — Fechamento
+## T5 — Saldo da Loja e Fechamento
 
-- [x] Conferir as três telas no computador e celular; acessibilidade básica e impressão via CSS.
-- [x] Confirmar ausência de dados fictícios, senhas e chaves secretas.
-- [x] Revisar configuração e RLS.
-- [x] Documentar migração SQL `restaurar_acesso_admin.sql` necessária para autorizar o admin no Supabase existente.
-- [x] Atualizar esta lista com evidências e limitações.
+- [x] Tela exclusiva "Resumo Geral por Sabor — Saldo da Loja" com filtro por OP ou geral.
+- [x] Cálculo: Saldo da Loja = Embutido Real − Separado Atacado (excluindo pedidos cancelados).
+- [x] Destaque de saldo negativo e rodapé com totais calculados.
+- [x] Conferir as quatro telas em computador e celular; impressão CSS.
+- [x] Documentar migração SQL `restaurar_acesso_admin.sql`.
 
 ## Registro a preencher pelo Jules em cada PR
 
 | Informação | Resultado |
 |---|---|
-| Tarefa implementada | Autenticação Supabase Auth, autorização do Admin UID (`fc952189-34d3-4963-b6c6-f408a249a47b`) e 3 telas do app |
+| Tarefa implementada | Tela inicial de login exclusiva, 4 telas operacionais (Planejamento, Produção, Expedição, Saldo da Loja) |
 | Arquivos alterados | `config.js`, `index.html`, `app.js`, `restaurar_acesso_admin.sql`, `schema.sql`, `spec.md`, `AGENTS.md`, `README.md`, `task.md` |
-| Teste local executado | Testes JS via Node e verificação visual do modal de login e rotas bloqueadas |
-| Teste no Supabase executado ou pendente | Conexão verificada. Resta executar `restaurar_acesso_admin.sql` no SQL Editor do Supabase |
-| SQL a executar, se houver | Executar `restaurar_acesso_admin.sql` no SQL Editor do Supabase para autorizar o UID do admin |
+| Teste local executado | Testes JS de cálculo de saldo, roteador de 4 telas, login e sessão |
+| Teste no Supabase executado ou pendente | Conexão verificada com `ydvgbfbrkdfdtclbfqtc.supabase.co`. Resta executar `restaurar_acesso_admin.sql` no SQL Editor |
+| SQL a executar, se houver | Executar `restaurar_acesso_admin.sql` no SQL Editor do Supabase |
 | PR/branch publicada | Branch `jules-6857193963919618962-d46122fc` com PR para `main` |
 | Merge efetuado ou pendente | Pendente de revisão e clique no botão "Publish PR" / Merge pelo usuário |
 | Pages publicado e verificado ou pendente | Pendente do merge na `main` e ativação em Settings -> Pages |
-| Próxima tarefa | Executar `restaurar_acesso_admin.sql` no Supabase, fazer merge da PR e testar login no Pages |
-
-**Regra de publicação:** alteração → commit → PR → revisão/merge em `main` → publicação Pages → teste pelo link.
+| Próxima tarefa | Executar `restaurar_acesso_admin.sql` no Supabase, fazer merge da PR e testar no Pages |

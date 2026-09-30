@@ -1,4 +1,4 @@
-/* app.js — Lógica da Aplicação Controle de Produção Simples (Autenticado via Supabase Auth) */
+/* app.js — Lógica da Aplicação Controle de Produção Simples (Quatro Telas) */
 
 // Variáveis Globais
 let supabaseClient = null;
@@ -57,7 +57,7 @@ function setupRouter() {
 
 function router() {
   const hash = window.location.hash.replace('#', '') || 'planejamento';
-  const validScreens = ['planejamento', 'producao', 'expedicao'];
+  const validScreens = ['planejamento', 'producao', 'expedicao', 'saldo-loja'];
   const activeScreen = validScreens.includes(hash) ? hash : 'planejamento';
 
   // Ocultar todas as telas
@@ -84,7 +84,8 @@ function router() {
     const titles = {
       planejamento: '1. Planejamento de Produção',
       producao: '2. Acompanhamento da Produção',
-      expedicao: '3. Expedição e Pedidos Atacado'
+      expedicao: '3. Expedição e Pedidos Atacado',
+      'saldo-loja': '4. Resumo Geral por Sabor — Saldo da Loja'
     };
     headerTitle.textContent = titles[activeScreen];
   }
@@ -94,6 +95,7 @@ function router() {
     if (activeScreen === 'planejamento') loadPlanejamentoData();
     if (activeScreen === 'producao') loadProducaoData();
     if (activeScreen === 'expedicao') loadExpedicaoData();
+    if (activeScreen === 'saldo-loja') loadSaldoLojaData();
   }
 }
 
@@ -105,24 +107,22 @@ async function checkSessionAndPermissions() {
 
   if (session && session.user) {
     currentUser = session.user;
-    updateUserUiLoggedIn(currentUser);
     await verifyUserAccess();
   } else {
     currentUser = null;
     userIsAuthorized = false;
-    updateUserUiLoggedOut();
+    showLoginView();
   }
 
   // Escutar mudanças de autenticação
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session && session.user) {
       currentUser = session.user;
-      updateUserUiLoggedIn(currentUser);
       await verifyUserAccess();
     } else {
       currentUser = null;
       userIsAuthorized = false;
-      updateUserUiLoggedOut();
+      showLoginView();
     }
   });
 }
@@ -130,6 +130,7 @@ async function checkSessionAndPermissions() {
 async function verifyUserAccess() {
   if (!supabaseClient || !currentUser) {
     userIsAuthorized = false;
+    showLoginView();
     return;
   }
 
@@ -147,33 +148,39 @@ async function verifyUserAccess() {
   }
 
   if (!userIsAuthorized) {
-    showGlobalAlert('Atenção: Seu usuário autenticado não possui autorização no banco de dados. Execute a migração "restaurar_acesso_admin.sql" no SQL Editor do Supabase para autorizar.');
+    showLoginView('Atenção: Seu usuário autenticado não possui autorização no banco de dados. Execute o arquivo restaurar_acesso_admin.sql no Supabase.');
   } else {
-    hideGlobalAlert();
+    showAppShell();
     await loadColaboradores();
     router(); // Recarregar dados da tela atual
   }
 }
 
-function updateUserUiLoggedIn(user) {
-  const displayEl = document.getElementById('user-display-email');
-  if (displayEl) {
-    if (user.id === ADMIN_UID) {
-      displayEl.textContent = 'Admin (' + user.email + ')';
-    } else {
-      displayEl.textContent = user.email;
-    }
+function showLoginView(errorMsg = '') {
+  document.getElementById('view-login').classList.remove('hidden');
+  document.getElementById('app-shell').classList.add('hidden');
+
+  const errEl = document.getElementById('login-error-msg');
+  if (errorMsg) {
+    errEl.textContent = errorMsg;
+    errEl.classList.remove('hidden');
+  } else {
+    errEl.classList.add('hidden');
   }
-  document.getElementById('btn-open-login').classList.add('hidden');
-  document.getElementById('btn-logout').classList.remove('hidden');
 }
 
-function updateUserUiLoggedOut() {
+function showAppShell() {
+  document.getElementById('view-login').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+
   const displayEl = document.getElementById('user-display-email');
-  if (displayEl) displayEl.textContent = 'Não autenticado';
-  document.getElementById('btn-open-login').classList.remove('hidden');
-  document.getElementById('btn-logout').classList.add('hidden');
-  showGlobalAlert('Acesso restrito. Efetue login para visualizar os dados operacionais.');
+  if (displayEl && currentUser) {
+    if (currentUser.id === ADMIN_UID) {
+      displayEl.textContent = 'Admin (' + currentUser.email + ')';
+    } else {
+      displayEl.textContent = currentUser.email;
+    }
+  }
 }
 
 async function handleLoginSubmit(e) {
@@ -190,8 +197,6 @@ async function handleLoginSubmit(e) {
   try {
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) throw error;
-
-    closeModal('modal-login');
   } catch (err) {
     errorMsgEl.textContent = err.message || 'Falha na autenticação. Verifique e-mail e senha.';
     errorMsgEl.classList.remove('hidden');
@@ -207,12 +212,7 @@ async function handleLogout() {
   }
   currentUser = null;
   userIsAuthorized = false;
-  updateUserUiLoggedOut();
-}
-
-function openLoginModal() {
-  document.getElementById('login-error-msg').classList.add('hidden');
-  openModal('modal-login');
+  showLoginView();
 }
 
 // Helpers para exibição de alertas globais e formatação de erros
@@ -361,7 +361,6 @@ async function loadPlanejamentoData() {
   tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-text-muted">Carregando OPs...</td></tr>';
 
   try {
-    // Buscar OPs e Sabores
     const { data: ops, error: errOps } = await supabaseClient
       .from('ordem_producao')
       .select('*')
@@ -377,7 +376,6 @@ async function loadPlanejamentoData() {
 
     opList = ops || [];
 
-    // Mapear sabores por ordem_id
     opSaboresMap = {};
     (sabores || []).forEach(s => {
       if (!opSaboresMap[s.ordem_id]) opSaboresMap[s.ordem_id] = [];
@@ -462,10 +460,8 @@ function openNovaOpModal() {
   document.getElementById('op-situacao-container').classList.add('hidden');
   document.getElementById('op-error-msg').classList.add('hidden');
 
-  // Set default date to today
   document.getElementById('op-data').value = new Date().toISOString().split('T')[0];
 
-  // Render inicial de 1 linha de sabor vazia
   const container = document.getElementById('container-sabores-op');
   container.innerHTML = '';
   adicionarLinhaSaborOp();
@@ -487,7 +483,6 @@ function openEditOpModal(opId) {
   document.getElementById('op-situacao-container').classList.remove('hidden');
   document.getElementById('op-error-msg').classList.add('hidden');
 
-  // Sabores
   const container = document.getElementById('container-sabores-op');
   container.innerHTML = '';
   const sabores = opSaboresMap[op.id] || [];
@@ -548,7 +543,6 @@ async function handleSalvarOp(e) {
 
   errorMsgEl.classList.add('hidden');
 
-  // Coletar sabores
   const saborRows = document.querySelectorAll('.sabor-op-row');
   const saboresArr = [];
   const nomesVistos = new Set();
@@ -582,7 +576,6 @@ async function handleSalvarOp(e) {
 
   try {
     if (!editId) {
-      // Criação nova pela RPC `fn_criar_ordem_producao`
       const payloadSabores = saboresArr.map(s => ({ nome: s.nome, planejado_kg: s.planejado_kg }));
       const { data: opId, error } = await supabaseClient.rpc('fn_criar_ordem_producao', {
         p_numero: numero,
@@ -594,10 +587,8 @@ async function handleSalvarOp(e) {
 
       if (error) throw error;
     } else {
-      // Edição de OP existente e seus sabores
       const situacao = document.getElementById('op-situacao').value;
 
-      // 1. Atualizar Ordem Producao
       const { error: errOp } = await supabaseClient
         .from('ordem_producao')
         .update({ numero, data, responsavel, observacoes, situacao })
@@ -605,7 +596,6 @@ async function handleSalvarOp(e) {
 
       if (errOp) throw errOp;
 
-      // 2. Atualizar ou inserir sabores
       for (const s of saboresArr) {
         if (s.id) {
           const { error: errSabor } = await supabaseClient
@@ -662,7 +652,6 @@ async function loadProducaoData() {
   if (!supabaseClient || !userIsAuthorized) return;
 
   try {
-    // Carregar OPs ativas para o dropdown
     const { data: ops, error } = await supabaseClient
       .from('ordem_producao')
       .select('id, numero, data, responsavel, situacao')
@@ -713,7 +702,6 @@ async function handleSelectOpProducao(opId) {
 
 async function renderProducaoDetachedOpData(opId) {
   try {
-    // 1. Dados da OP
     const { data: op, error: errOp } = await supabaseClient
       .from('ordem_producao')
       .select('*')
@@ -726,7 +714,6 @@ async function renderProducaoDetachedOpData(opId) {
     document.getElementById('prod-op-subtitulo').textContent =
       `Data: ${formatDateLocal(op.data)} • Responsável: ${escapeHtml(op.responsavel)} • Situação: ${op.situacao}`;
 
-    // 2. Bateladas
     const { data: bateladas, error: errBat } = await supabaseClient
       .from('batelada')
       .select('*')
@@ -735,7 +722,6 @@ async function renderProducaoDetachedOpData(opId) {
 
     if (errBat) throw errBat;
 
-    // 3. Sabores (Embutimento)
     const { data: sabores, error: errSab } = await supabaseClient
       .from('ordem_sabor')
       .select('*')
@@ -744,7 +730,6 @@ async function renderProducaoDetachedOpData(opId) {
 
     if (errSab) throw errSab;
 
-    // Totais do Header
     const totalPlanejado = (sabores || []).reduce((acc, s) => acc + (parseFloat(s.planejado_kg) || 0), 0);
     const totalEmbutido = (sabores || []).reduce((acc, s) => acc + (s.embutido_kg !== null ? (parseFloat(s.embutido_kg) || 0) : 0), 0);
 
@@ -831,7 +816,7 @@ function renderEmbutimentoList(sabores) {
   const container = document.getElementById('lista-embutimento-container');
 
   if (sabores.length === 0) {
-    container.innerHTML = '<p class="text-text-muted text-sm py-4 text-center">Nenum sabor cadastrado para esta OP.</p>';
+    container.innerHTML = '<p class="text-text-muted text-sm py-4 text-center">Nenhum sabor cadastrado para esta OP.</p>';
     return;
   }
 
@@ -865,7 +850,7 @@ function renderEmbutimentoList(sabores) {
           <div class="flex items-center gap-2">
             <span class="text-xs uppercase font-bold text-text-muted">Embutido Real:</span>
             <span class="text-lg font-extrabold ${isEmbutidoSet ? 'text-emerald-700' : 'text-amber-600'}">
-              ${isEmbutidoSet ? formatKg(embutido) + ' kg' : 'Pendente (Não informado)'}
+              ${isEmbutidoSet ? formatKg(embutido) + ' kg' : 'Não informado'}
             </span>
             <span class="px-2 py-0.5 rounded text-xs font-bold ${diffBadgeClass}">
               Dif: ${diffKgText} (${diffPctText})
@@ -934,7 +919,6 @@ async function handleSalvarEmbutimentoSabor(e, saborId) {
 
   const embutidoKg = embutidoVal !== '' ? parseFloat(embutidoVal) : null;
 
-  // Validação: insumos_separados exige responsável
   if (insumosSeparados && !respInsumos) {
     alert('A marcação "Insumos Separados" exige informar o responsável.');
     return;
@@ -1041,14 +1025,12 @@ async function handleSalvarBatelada(e) {
 
   errorMsgEl.classList.add('hidden');
 
-  // Validação total <= 150 kg
   const totalKg = carneKg + temperosKg;
   if (totalKg > 150) {
     showBateladaError(`Capacidade máxima excedida! Total: ${formatKg(totalKg)} kg. O limite é 150,000 kg.`);
     return;
   }
 
-  // Validação: marcações exigem responsáveis
   if (separado && !respSeparacao) {
     showBateladaError('A marcação "Separado" exige selecionar o Responsável pela Separação.');
     return;
@@ -1117,7 +1099,6 @@ async function loadExpedicaoData() {
   if (!supabaseClient || !userIsAuthorized) return;
 
   try {
-    // 1. Carregar Pedidos e seus itens
     const { data: pedidos, error: errPed } = await supabaseClient
       .from('pedido')
       .select('*, ordem_producao(numero)')
@@ -1131,82 +1112,10 @@ async function loadExpedicaoData() {
 
     if (errItens) throw errItens;
 
-    // 2. Carregar todos os sabores para montar a Matriz de Resumo
-    const { data: todosSabores, error: errSabores } = await supabaseClient
-      .from('ordem_sabor')
-      .select('*, ordem_producao(numero, situacao)');
-
-    if (errSabores) throw errSabores;
-
-    renderResumoSaboresMatriz(todosSabores || [], pedidos || [], itens || []);
     renderPedidosTable(pedidos || [], itens || []);
   } catch (err) {
     console.error('Erro ao carregar dados da Expedição:', err);
   }
-}
-
-function renderResumoSaboresMatriz(sabores, pedidos, itens) {
-  const tbody = document.getElementById('resumo-sabores-expedicao-tbody');
-  if (!tbody) return;
-
-  if (sabores.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-text-muted">Nenhum sabor cadastrado no sistema.</td></tr>';
-    return;
-  }
-
-  // Agrupar itens de pedidos não cancelados por ordem_sabor_id
-  const pedAtivosIds = new Set(pedidos.filter(p => p.situacao !== 'cancelado').map(p => p.id));
-  const solicitadoMap = {};
-  const separadoMap = {};
-
-  itens.forEach(it => {
-    if (pedAtivosIds.has(it.pedido_id)) {
-      solicitadoMap[it.ordem_sabor_id] = (solicitadoMap[it.ordem_sabor_id] || 0) + (parseFloat(it.solicitado_kg) || 0);
-      separadoMap[it.ordem_sabor_id] = (separadoMap[it.ordem_sabor_id] || 0) + (parseFloat(it.separado_kg) || 0);
-    }
-  });
-
-  tbody.innerHTML = sabores.map(s => {
-    const opNumero = s.ordem_producao ? s.ordem_producao.numero : '—';
-    const planejado = parseFloat(s.planejado_kg) || 0;
-    const isEmbutidoSet = s.embutido_kg !== null && s.embutido_kg !== undefined;
-    const embutido = isEmbutidoSet ? parseFloat(s.embutido_kg) : null;
-    const solicitado = solicitadoMap[s.id] || 0;
-    const separado = separadoMap[s.id] || 0;
-
-    let saldoLojaText = 'Pendente';
-    let saldoBadgeClass = 'bg-gray-100 text-gray-600';
-
-    if (isEmbutidoSet) {
-      const saldo = embutido - separado;
-      saldoLojaText = `${formatKg(saldo)} kg`;
-
-      if (saldo < 0) {
-        saldoBadgeClass = 'bg-red-100 text-red-800 font-extrabold';
-      } else {
-        saldoBadgeClass = 'bg-emerald-100 text-emerald-800 font-bold';
-      }
-    }
-
-    return `
-      <tr class="hover:bg-gray-50">
-        <td class="p-2 border-r border-border font-medium">
-          ${escapeHtml(s.nome)} <span class="text-xs text-text-muted">(OP #${escapeHtml(opNumero)})</span>
-        </td>
-        <td class="p-2 border-r border-border text-right">${formatKg(planejado)} kg</td>
-        <td class="p-2 border-r border-border text-right font-bold ${isEmbutidoSet ? 'text-emerald-700' : 'text-amber-600'}">
-          ${isEmbutidoSet ? formatKg(embutido) + ' kg' : 'Pendente'}
-        </td>
-        <td class="p-2 border-r border-border text-right">${formatKg(solicitado)} kg</td>
-        <td class="p-2 border-r border-border text-right">${formatKg(separado)} kg</td>
-        <td class="p-2 text-right">
-          <span class="px-2 py-0.5 rounded text-xs ${saldoBadgeClass}">
-            ${saldoLojaText}
-          </span>
-        </td>
-      </tr>
-    `;
-  }).join('');
 }
 
 function renderPedidosTable(pedidos, itens) {
@@ -1218,7 +1127,6 @@ function renderPedidosTable(pedidos, itens) {
     return;
   }
 
-  // Mapear itens por pedido_id
   const itensMap = {};
   itens.forEach(it => {
     if (!itensMap[it.pedido_id]) itensMap[it.pedido_id] = [];
@@ -1269,10 +1177,8 @@ async function openNovoPedidoModal() {
   document.getElementById('pedido-situacao-container').classList.add('hidden');
   document.getElementById('pedido-error-msg').classList.add('hidden');
 
-  // Set default date to today
   document.getElementById('pedido-data').value = new Date().toISOString().split('T')[0];
 
-  // Popular OPs disponíveis
   const selectOp = document.getElementById('pedido-ordem-id');
   const { data: ops } = await supabaseClient
     .from('ordem_producao')
@@ -1367,16 +1273,14 @@ async function openEditPedidoModal(pedidoId) {
     document.getElementById('pedido-situacao-container').classList.remove('hidden');
     document.getElementById('pedido-error-msg').classList.add('hidden');
 
-    // Carregar OP vinculada
     const selectOp = document.getElementById('pedido-ordem-id');
     const { data: ops } = await supabaseClient
       .from('ordem_producao')
       .select('id, numero, data');
 
     selectOp.innerHTML = (ops || []).map(o => `<option value="${o.id}" ${o.id === p.ordem_id ? 'selected' : ''}>OP #${escapeHtml(o.numero)} (${formatDateLocal(o.data)})</option>`).join('');
-    selectOp.disabled = true; // Não permite trocar OP do pedido em edição
+    selectOp.disabled = true;
 
-    // Carregar sabores da OP
     const { data: sabores } = await supabaseClient
       .from('ordem_sabor')
       .select('*')
@@ -1384,7 +1288,6 @@ async function openEditPedidoModal(pedidoId) {
 
     opSaboresMap[p.ordem_id] = sabores || [];
 
-    // Renderizar itens
     const container = document.getElementById('container-itens-pedido');
     container.innerHTML = '';
     (pItens || []).forEach(it => {
@@ -1411,7 +1314,6 @@ async function handleSalvarPedido(e) {
 
   errorMsgEl.classList.add('hidden');
 
-  // Coletar itens
   const itemRows = document.querySelectorAll('.item-pedido-row');
   const itensArr = [];
 
@@ -1449,7 +1351,6 @@ async function handleSalvarPedido(e) {
 
   try {
     if (!editId) {
-      // Criação nova pela RPC `fn_criar_pedido`
       const payloadItens = itensArr.map(it => ({
         ordem_sabor_id: it.ordem_sabor_id,
         conservacao: it.conservacao,
@@ -1468,7 +1369,6 @@ async function handleSalvarPedido(e) {
 
       if (error) throw error;
     } else {
-      // Edição de pedido existente
       const situacao = document.getElementById('pedido-situacao').value;
 
       const { error: errPed } = await supabaseClient
@@ -1478,7 +1378,6 @@ async function handleSalvarPedido(e) {
 
       if (errPed) throw errPed;
 
-      // Atualizar separado_kg dos itens
       for (const it of itensArr) {
         if (it.id) {
           const { error: errIt } = await supabaseClient
@@ -1523,6 +1422,155 @@ async function cancelarPedido(pedidoId) {
 }
 
 // ============================================================================
+// 6. TELA 4 — RESUMO GERAL POR SABOR (SALDO DA LOJA)
+// ============================================================================
+
+async function loadSaldoLojaData(opIdFiltro = '') {
+  if (!supabaseClient || !userIsAuthorized) return;
+
+  const tbody = document.getElementById('saldo-loja-tbody');
+  const tfoot = document.getElementById('saldo-loja-tfoot');
+  tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-text-muted">Carregando saldo da loja...</td></tr>';
+  tfoot.innerHTML = '';
+
+  try {
+    // 1. Popular OPs para filtro
+    const selectOp = document.getElementById('select-op-saldo-loja');
+    const { data: ops } = await supabaseClient
+      .from('ordem_producao')
+      .select('id, numero, data')
+      .neq('situacao', 'cancelada')
+      .order('criado_em', { ascending: false });
+
+    const currentFiltro = opIdFiltro || selectOp.value;
+    selectOp.innerHTML = '<option value="">-- Todas as OPs Ativas --</option>' +
+      (ops || []).map(o => `<option value="${o.id}" ${o.id === currentFiltro ? 'selected' : ''}>OP #${escapeHtml(o.numero)} (${formatDateLocal(o.data)})</option>`).join('');
+
+    // 2. Buscar sabores de acordo com o filtro
+    let querySabores = supabaseClient
+      .from('ordem_sabor')
+      .select('*, ordem_producao(numero, situacao)');
+
+    if (currentFiltro) {
+      querySabores = querySabores.eq('ordem_id', currentFiltro);
+    }
+
+    const { data: sabores, error: errSabores } = await querySabores;
+    if (errSabores) throw errSabores;
+
+    // Filtrar sabores de OPs canceladas se não filtrado por OP específica
+    const saboresAtivos = (sabores || []).filter(s => s.ordem_producao && s.ordem_producao.situacao !== 'cancelada');
+
+    // 3. Buscar Pedidos ativos para somar quantidades separadas de atacado
+    const { data: pedidos, error: errPed } = await supabaseClient
+      .from('pedido')
+      .select('id, situacao')
+      .neq('situacao', 'cancelado');
+
+    if (errPed) throw errPed;
+
+    const { data: itens, error: errItens } = await supabaseClient
+      .from('pedido_item')
+      .select('pedido_id, ordem_sabor_id, separado_kg');
+
+    if (errItens) throw errItens;
+
+    // Mapear total separado por ordem_sabor_id (somando resfriado e congelado)
+    const pedAtivosIds = new Set((pedidos || []).map(p => p.id));
+    const separadoMap = {};
+
+    (itens || []).forEach(it => {
+      if (pedAtivosIds.has(it.pedido_id)) {
+        separadoMap[it.ordem_sabor_id] = (separadoMap[it.ordem_sabor_id] || 0) + (parseFloat(it.separado_kg) || 0);
+      }
+    });
+
+    renderSaldoLojaTable(saboresAtivos, separadoMap);
+  } catch (err) {
+    console.error('Erro ao carregar Saldo da Loja:', err);
+    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-error-text font-semibold">${escapeHtml(formatErrorMessage(err))}</td></tr>`;
+  }
+}
+
+function renderSaldoLojaTable(sabores, separadoMap) {
+  const tbody = document.getElementById('saldo-loja-tbody');
+  const tfoot = document.getElementById('saldo-loja-tfoot');
+
+  if (sabores.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-text-muted">Nenhum sabor encontrado para o filtro selecionado.</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+
+  let totalPlanejado = 0;
+  let totalEmbutido = 0;
+  let totalSeparado = 0;
+  let hasAnyEmbutidoSet = false;
+
+  tbody.innerHTML = sabores.map(s => {
+    const opNumero = s.ordem_producao ? s.ordem_producao.numero : '—';
+    const planejado = parseFloat(s.planejado_kg) || 0;
+    const isEmbutidoSet = s.embutido_kg !== null && s.embutido_kg !== undefined;
+    const embutido = isEmbutidoSet ? parseFloat(s.embutido_kg) : null;
+    const separado = separadoMap[s.id] || 0;
+
+    totalPlanejado += planejado;
+    totalSeparado += separado;
+
+    let embutidoText = 'Não informado';
+    let saldoLojaText = 'Não informado';
+    let saldoBadgeClass = 'bg-gray-100 text-gray-600 font-semibold';
+
+    if (isEmbutidoSet) {
+      hasAnyEmbutidoSet = true;
+      totalEmbutido += embutido;
+      embutidoText = formatKg(embutido) + ' kg';
+
+      const saldo = embutido - separado;
+      saldoLojaText = formatKg(saldo) + ' kg';
+
+      if (saldo < 0) {
+        saldoBadgeClass = 'bg-red-100 text-red-800 font-extrabold';
+      } else {
+        saldoBadgeClass = 'bg-emerald-100 text-emerald-800 font-bold';
+      }
+    }
+
+    return `
+      <tr class="hover:bg-gray-50">
+        <td class="p-3 border-r border-border font-medium">
+          ${escapeHtml(s.nome)} <span class="text-xs text-text-muted">(OP #${escapeHtml(opNumero)})</span>
+        </td>
+        <td class="p-3 border-r border-border text-right font-medium">${formatKg(planejado)} kg</td>
+        <td class="p-3 border-r border-border text-right font-bold ${isEmbutidoSet ? 'text-emerald-700' : 'text-amber-600'}">
+          ${embutidoText}
+        </td>
+        <td class="p-3 border-r border-border text-right font-medium">${formatKg(separado)} kg</td>
+        <td class="p-3 text-right">
+          <span class="px-2.5 py-1 rounded text-xs ${saldoBadgeClass}">
+            ${saldoLojaText}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Totais do Footer
+  const totalSaldoLojaText = hasAnyEmbutidoSet ? formatKg(totalEmbutido - totalSeparado) + ' kg' : 'Não informado';
+  const totalSaldoClass = (hasAnyEmbutidoSet && (totalEmbutido - totalSeparado) < 0) ? 'text-red-700 font-extrabold' : 'text-emerald-700 font-extrabold';
+
+  tfoot.innerHTML = `
+    <tr>
+      <td class="p-3 border-r border-border">TOTAL GERAL</td>
+      <td class="p-3 border-r border-border text-right text-primary">${formatKg(totalPlanejado)} kg</td>
+      <td class="p-3 border-r border-border text-right text-emerald-700">${hasAnyEmbutidoSet ? formatKg(totalEmbutido) + ' kg' : 'Não informado'}</td>
+      <td class="p-3 border-r border-border text-right">${formatKg(totalSeparado)} kg</td>
+      <td class="p-3 text-right ${totalSaldoClass}">${totalSaldoLojaText}</td>
+    </tr>
+  `;
+}
+
+// ============================================================================
 // UTILITÁRIOS E HELPERS
 // ============================================================================
 
@@ -1535,7 +1583,6 @@ function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.add('hidden');
 
-  // Re-enable OP select when closing order modal
   const selectOp = document.getElementById('pedido-ordem-id');
   if (selectOp) selectOp.disabled = false;
 }
